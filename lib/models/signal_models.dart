@@ -94,6 +94,7 @@ class RadarSignal {
     this.style = SignalStyle.standard,
     this.trend1m = Bias.neutral,
     this.leverage = 1,
+    this.reasonCodes = const <String>[],
     this.status = SignalStatus.waitingEntry,
     this.entryTime,
     this.tp1Time,
@@ -136,6 +137,7 @@ class RadarSignal {
   final Bias bos;
   final Bias choch;
   final int leverage;
+  final List<String> reasonCodes;
   final SignalStatus status;
   final DateTime? entryTime;
   final DateTime? tp1Time;
@@ -222,6 +224,7 @@ class RadarSignal {
     double? mfePercent,
     double? maePercent,
     double? resultR,
+    List<String>? reasonCodes,
   }) {
     return RadarSignal(
       id: id,
@@ -253,6 +256,7 @@ class RadarSignal {
       bos: bos,
       choch: choch,
       leverage: leverage,
+      reasonCodes: reasonCodes ?? this.reasonCodes,
       status: status ?? this.status,
       entryTime: entryTime ?? this.entryTime,
       tp1Time: tp1Time ?? this.tp1Time,
@@ -299,6 +303,7 @@ class RadarSignal {
       'bos': bos.name,
       'choch': choch.name,
       'leverage': leverage,
+      'reasonCodes': reasonCodes,
       'status': status.name,
       'entryTime': entryTime?.toIso8601String(),
       'tp1Time': tp1Time?.toIso8601String(),
@@ -352,6 +357,7 @@ class RadarSignal {
       bos: _bias(json['bos']),
       choch: _bias(json['choch']),
       leverage: _int(json['leverage']) == 0 ? 1 : _int(json['leverage']),
+      reasonCodes: _stringList(json['reasonCodes']),
       status: _enumByName(
         SignalStatus.values,
         json['status'],
@@ -395,6 +401,15 @@ double _double(Object? raw) {
 
 int _int(Object? raw) {
   return int.tryParse(raw?.toString() ?? '') ?? 0;
+}
+
+List<String> _stringList(Object? raw) {
+  if (raw is! List<dynamic>) {
+    return const <String>[];
+  }
+  return raw
+      .map<String>((dynamic value) => value.toString())
+      .toList(growable: false);
 }
 
 double _clampDouble(double value, double minimum, double maximum) {

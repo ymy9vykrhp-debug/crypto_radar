@@ -12,6 +12,7 @@ import '../services/journal_controller.dart';
 import '../services/journal_store.dart';
 import '../widgets/risk_reward_table.dart';
 import 'journal_screen.dart';
+import 'why_now_screen.dart';
 
 class CryptoRadarHome extends StatefulWidget {
   const CryptoRadarHome({super.key, this.autoStart = true});
@@ -135,7 +136,7 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Scaffold(
         appBar: AppBar(
           titleSpacing: 18,
@@ -161,6 +162,7 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
               Tab(text: 'ГЛАВНАЯ'),
               Tab(text: 'ПОДТВЕРЖДЕНИЯ'),
               Tab(text: 'ДЕТАЛИ'),
+              Tab(text: 'ПОЧЕМУ?'),
               Tab(text: 'ЖУРНАЛ'),
             ],
           ),
@@ -182,6 +184,9 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
                   _snapshot == null
                       ? _buildEmptyState()
                       : _buildDetails(_snapshot!),
+                  _snapshot == null
+                      ? _buildEmptyState()
+                      : WhyNowScreen(marketSnapshot: _snapshot!),
                   JournalScreen(controller: _journalController),
                 ],
               ),
@@ -393,7 +398,24 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
         _Panel(
           title: 'Что делать сейчас',
           icon: Icons.bolt_rounded,
-          child: Text(action, style: Theme.of(context).textTheme.titleMedium),
+          child: Wrap(
+            spacing: 16,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            alignment: WrapAlignment.spaceBetween,
+            children: <Widget>[
+              Text(action, style: Theme.of(context).textTheme.titleMedium),
+              Builder(
+                builder: (BuildContext tabContext) => FilledButton.icon(
+                  onPressed: () {
+                    DefaultTabController.of(tabContext).animateTo(3);
+                  },
+                  icon: const Icon(Icons.help_outline_rounded),
+                  label: const Text('ПОЧЕМУ?'),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
         _TradePlanCard(plan: plan, signal: snapshot.signal),
@@ -1136,7 +1158,7 @@ class _ConfirmationRow extends StatelessWidget {
           SizedBox(
             width: 22,
             child: Text(
-              '+${item.weight}',
+              item.bias == Bias.neutral ? '—' : '+${item.weight}',
               textAlign: TextAlign.right,
               style: const TextStyle(color: Colors.white38),
             ),

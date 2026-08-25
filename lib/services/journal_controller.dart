@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../engines/backtest_engine.dart';
+import '../engines/decision_engine.dart';
 import '../engines/signal_engine.dart';
 import '../engines/trade_tracker.dart';
 import '../models/backtest_models.dart';
@@ -39,6 +40,20 @@ class JournalController extends ChangeNotifier {
       return;
     }
     _signals = await store.loadSignals();
+    bool migratedReasonCodes = false;
+    for (int index = 0; index < _signals.length; index++) {
+      if (_signals[index].reasonCodes.isEmpty) {
+        _signals[index] = _signals[index].copyWith(
+          reasonCodes: DecisionEngine.persistedReasonCodesForSignal(
+            _signals[index],
+          ),
+        );
+        migratedReasonCodes = true;
+      }
+    }
+    if (migratedReasonCodes) {
+      await store.saveSignals(_signals);
+    }
     _backtests = await store.loadBacktests();
     _initialized = true;
     _notify();
@@ -72,17 +87,20 @@ class JournalController extends ChangeNotifier {
       if (candidate == null) {
         continue;
       }
+      final RadarSignal enrichedCandidate = candidate.copyWith(
+        reasonCodes: DecisionEngine.persistedReasonCodesForSignal(candidate),
+      );
       final bool hasActiveStyle = _signals.any(
         (RadarSignal signal) =>
             signal.symbol == snapshot.symbol &&
-            signal.style == candidate.style &&
+            signal.style == enrichedCandidate.style &&
             signal.status.isActive,
       );
       final bool alreadySaved = _signals.any(
-        (RadarSignal signal) => signal.id == candidate.id,
+        (RadarSignal signal) => signal.id == enrichedCandidate.id,
       );
       if (!hasActiveStyle && !alreadySaved) {
-        _signals.insert(0, candidate);
+        _signals.insert(0, enrichedCandidate);
         changed = true;
       }
     }

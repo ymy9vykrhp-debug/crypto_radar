@@ -71,6 +71,14 @@ void main() {
     );
     expect(signal.leverage, lessThanOrEqualTo(10));
   });
+
+  test('persists stable reason codes in the local journal record', () {
+    final RadarSignal signal = _signal(start)
+        .copyWith(reasonCodes: const <String>['BOS_CONFIRMED', 'RVOL_HIGH']);
+    final RadarSignal restored = RadarSignal.fromJson(signal.toJson());
+
+    expect(restored.reasonCodes, <String>['BOS_CONFIRMED', 'RVOL_HIGH']);
+  });
 }
 
 RadarSignal _signal(DateTime time, {SignalStyle style = SignalStyle.standard}) {

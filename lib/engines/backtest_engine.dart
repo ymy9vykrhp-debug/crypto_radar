@@ -2,6 +2,7 @@ import '../models/backtest_models.dart';
 import '../models/market_models.dart';
 import '../models/signal_models.dart';
 import '../services/bybit_service.dart';
+import 'decision_engine.dart';
 import 'signal_engine.dart';
 import 'trade_tracker.dart';
 
@@ -140,7 +141,13 @@ class BacktestEngine {
             previousSetupTime != null &&
             baseClose.difference(previousSetupTime) < cooldown;
         if (!repeatedSetup) {
-          signals.add(candidate);
+          signals.add(
+            candidate.copyWith(
+              reasonCodes: DecisionEngine.persistedReasonCodesForSignal(
+                candidate,
+              ),
+            ),
+          );
           previousSetups[setupKey] = baseClose;
         }
       }

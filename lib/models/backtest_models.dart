@@ -91,6 +91,7 @@ class BacktestReport {
     required this.averageTradeMinutes,
     required this.factors,
     this.strategies = const <StrategyPerformance>[],
+    this.reasonCodes = const <FactorPerformance>[],
   });
 
   final String symbol;
@@ -109,6 +110,7 @@ class BacktestReport {
   final double averageTradeMinutes;
   final List<FactorPerformance> factors;
   final List<StrategyPerformance> strategies;
+  final List<FactorPerformance> reasonCodes;
 
   factory BacktestReport.fromSignals({
     required String symbol,
@@ -184,6 +186,7 @@ class BacktestReport {
       ),
       factors: _factorPerformance(finished),
       strategies: _strategyPerformance(source),
+      reasonCodes: _reasonCodePerformance(finished),
     );
   }
 
@@ -212,11 +215,17 @@ class BacktestReport {
           (StrategyPerformance strategy) => strategy.toJson(),
         )
         .toList(growable: false),
+    'reasonCodes': reasonCodes
+        .map<Map<String, Object?>>(
+          (FactorPerformance reason) => reason.toJson(),
+        )
+        .toList(growable: false),
   };
 
   factory BacktestReport.fromJson(Map<String, dynamic> json) {
     final Object? rawFactors = json['factors'];
     final Object? rawStrategies = json['strategies'];
+    final Object? rawReasonCodes = json['reasonCodes'];
     return BacktestReport(
       symbol: json['symbol']?.toString() ?? '',
       startedAt:
@@ -248,6 +257,12 @@ class BacktestReport {
                 .map<StrategyPerformance>(StrategyPerformance.fromJson)
                 .toList(growable: false)
           : const <StrategyPerformance>[],
+      reasonCodes: rawReasonCodes is List<dynamic>
+          ? rawReasonCodes
+                .whereType<Map<String, dynamic>>()
+                .map<FactorPerformance>(FactorPerformance.fromJson)
+                .toList(growable: false)
+          : const <FactorPerformance>[],
     );
   }
 }
@@ -407,6 +422,32 @@ List<StrategyPerformance> _strategyPerformance(List<RadarSignal> source) {
           profitFactor: grossLoss == 0.0
               ? grossProfit
               : grossProfit / grossLoss,
+        );
+      })
+      .toList(growable: false);
+}
+
+List<FactorPerformance> _reasonCodePerformance(List<RadarSignal> signals) {
+  final Set<String> allCodes = <String>{};
+  for (final RadarSignal signal in signals) {
+    allCodes.addAll(signal.reasonCodes);
+  }
+  final List<String> sortedCodes = allCodes.toList(growable: false)..sort();
+  return sortedCodes
+      .map<FactorPerformance>((String code) {
+        final List<RadarSignal> matching = signals
+            .where((RadarSignal signal) => signal.reasonCodes.contains(code))
+            .toList(growable: false);
+        return FactorPerformance(
+          name: code,
+          trades: matching.length,
+          winRate: _percent(
+            matching.where((RadarSignal signal) => signal.resultR > 0.0).length,
+            matching.length,
+          ),
+          averageR: _average(
+            matching.map<double>((RadarSignal signal) => signal.resultR),
+          ),
         );
       })
       .toList(growable: false);
