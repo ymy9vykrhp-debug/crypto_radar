@@ -1,0 +1,445 @@
+import 'market_models.dart';
+import 'signal_models.dart';
+
+class FactorPerformance {
+  const FactorPerformance({
+    required this.name,
+    required this.trades,
+    required this.winRate,
+    required this.averageR,
+  });
+
+  final String name;
+  final int trades;
+  final double winRate;
+  final double averageR;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'name': name,
+    'trades': trades,
+    'winRate': winRate,
+    'averageR': averageR,
+  };
+
+  factory FactorPerformance.fromJson(Map<String, dynamic> json) {
+    return FactorPerformance(
+      name: json['name']?.toString() ?? '',
+      trades: _asInt(json['trades']),
+      winRate: _asDouble(json['winRate']),
+      averageR: _asDouble(json['averageR']),
+    );
+  }
+}
+
+class StrategyPerformance {
+  const StrategyPerformance({
+    required this.style,
+    required this.signals,
+    required this.trades,
+    required this.winRate,
+    required this.averageR,
+    required this.profitFactor,
+  });
+
+  final SignalStyle style;
+  final int signals;
+  final int trades;
+  final double winRate;
+  final double averageR;
+  final double profitFactor;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'style': style.name,
+    'signals': signals,
+    'trades': trades,
+    'winRate': winRate,
+    'averageR': averageR,
+    'profitFactor': profitFactor,
+  };
+
+  factory StrategyPerformance.fromJson(Map<String, dynamic> json) {
+    return StrategyPerformance(
+      style: _enumByName(
+        SignalStyle.values,
+        json['style'],
+        SignalStyle.standard,
+      ),
+      signals: _asInt(json['signals']),
+      trades: _asInt(json['trades']),
+      winRate: _asDouble(json['winRate']),
+      averageR: _asDouble(json['averageR']),
+      profitFactor: _asDouble(json['profitFactor']),
+    );
+  }
+}
+
+class BacktestReport {
+  const BacktestReport({
+    required this.symbol,
+    required this.startedAt,
+    required this.finishedAt,
+    required this.signals,
+    required this.trades,
+    required this.winRate,
+    required this.tp1Percent,
+    required this.tp2Percent,
+    required this.stopPercent,
+    required this.averageR,
+    required this.profitFactor,
+    required this.maxDrawdownR,
+    required this.averageMovePercent,
+    required this.averageTradeMinutes,
+    required this.factors,
+    this.strategies = const <StrategyPerformance>[],
+  });
+
+  final String symbol;
+  final DateTime startedAt;
+  final DateTime finishedAt;
+  final int signals;
+  final int trades;
+  final double winRate;
+  final double tp1Percent;
+  final double tp2Percent;
+  final double stopPercent;
+  final double averageR;
+  final double profitFactor;
+  final double maxDrawdownR;
+  final double averageMovePercent;
+  final double averageTradeMinutes;
+  final List<FactorPerformance> factors;
+  final List<StrategyPerformance> strategies;
+
+  factory BacktestReport.fromSignals({
+    required String symbol,
+    required DateTime startedAt,
+    required DateTime finishedAt,
+    required List<RadarSignal> source,
+  }) {
+    final List<RadarSignal> trades = source
+        .where((RadarSignal signal) => signal.entryTime != null)
+        .toList(growable: false);
+    final List<RadarSignal> finished = trades
+        .where((RadarSignal signal) => !signal.status.isActive)
+        .toList(growable: false);
+    final int winners = finished
+        .where((RadarSignal signal) => signal.resultR > 0.0)
+        .length;
+    final int tp1Hits = trades
+        .where((RadarSignal signal) => signal.tp1Time != null)
+        .length;
+    final int tp2Hits = trades
+        .where((RadarSignal signal) => signal.tp2Time != null)
+        .length;
+    final int stops = trades
+        .where((RadarSignal signal) => signal.status == SignalStatus.stopped)
+        .length;
+    final double grossProfit = finished
+        .where((RadarSignal signal) => signal.resultR > 0.0)
+        .fold<double>(0.0, (double sum, RadarSignal signal) {
+          return sum + signal.resultR;
+        });
+    final double grossLoss = finished
+        .where((RadarSignal signal) => signal.resultR < 0.0)
+        .fold<double>(0.0, (double sum, RadarSignal signal) {
+          return sum + signal.resultR.abs();
+        });
+
+    double equity = 0.0;
+    double peak = 0.0;
+    double maxDrawdown = 0.0;
+    for (final RadarSignal signal in finished) {
+      equity += signal.resultR;
+      if (equity > peak) {
+        peak = equity;
+      }
+      final double drawdown = peak - equity;
+      if (drawdown > maxDrawdown) {
+        maxDrawdown = drawdown;
+      }
+    }
+
+    return BacktestReport(
+      symbol: symbol,
+      startedAt: startedAt,
+      finishedAt: finishedAt,
+      signals: source.length,
+      trades: trades.length,
+      winRate: _percent(winners, finished.length),
+      tp1Percent: _percent(tp1Hits, trades.length),
+      tp2Percent: _percent(tp2Hits, trades.length),
+      stopPercent: _percent(stops, trades.length),
+      averageR: _average(
+        finished.map<double>((RadarSignal signal) => signal.resultR),
+      ),
+      profitFactor: grossLoss == 0.0 ? grossProfit : grossProfit / grossLoss,
+      maxDrawdownR: maxDrawdown,
+      averageMovePercent: _average(
+        trades.map<double>((RadarSignal signal) => signal.mfePercent),
+      ),
+      averageTradeMinutes: _average(
+        finished.map<double>((RadarSignal signal) {
+          return signal.tradeDuration?.inMinutes.toDouble() ?? 0.0;
+        }),
+      ),
+      factors: _factorPerformance(finished),
+      strategies: _strategyPerformance(source),
+    );
+  }
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'symbol': symbol,
+    'startedAt': startedAt.toIso8601String(),
+    'finishedAt': finishedAt.toIso8601String(),
+    'signals': signals,
+    'trades': trades,
+    'winRate': winRate,
+    'tp1Percent': tp1Percent,
+    'tp2Percent': tp2Percent,
+    'stopPercent': stopPercent,
+    'averageR': averageR,
+    'profitFactor': profitFactor,
+    'maxDrawdownR': maxDrawdownR,
+    'averageMovePercent': averageMovePercent,
+    'averageTradeMinutes': averageTradeMinutes,
+    'factors': factors
+        .map<Map<String, Object?>>(
+          (FactorPerformance factor) => factor.toJson(),
+        )
+        .toList(growable: false),
+    'strategies': strategies
+        .map<Map<String, Object?>>(
+          (StrategyPerformance strategy) => strategy.toJson(),
+        )
+        .toList(growable: false),
+  };
+
+  factory BacktestReport.fromJson(Map<String, dynamic> json) {
+    final Object? rawFactors = json['factors'];
+    final Object? rawStrategies = json['strategies'];
+    return BacktestReport(
+      symbol: json['symbol']?.toString() ?? '',
+      startedAt:
+          DateTime.tryParse(json['startedAt']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+      finishedAt:
+          DateTime.tryParse(json['finishedAt']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+      signals: _asInt(json['signals']),
+      trades: _asInt(json['trades']),
+      winRate: _asDouble(json['winRate']),
+      tp1Percent: _asDouble(json['tp1Percent']),
+      tp2Percent: _asDouble(json['tp2Percent']),
+      stopPercent: _asDouble(json['stopPercent']),
+      averageR: _asDouble(json['averageR']),
+      profitFactor: _asDouble(json['profitFactor']),
+      maxDrawdownR: _asDouble(json['maxDrawdownR']),
+      averageMovePercent: _asDouble(json['averageMovePercent']),
+      averageTradeMinutes: _asDouble(json['averageTradeMinutes']),
+      factors: rawFactors is List<dynamic>
+          ? rawFactors
+                .whereType<Map<String, dynamic>>()
+                .map<FactorPerformance>(FactorPerformance.fromJson)
+                .toList(growable: false)
+          : const <FactorPerformance>[],
+      strategies: rawStrategies is List<dynamic>
+          ? rawStrategies
+                .whereType<Map<String, dynamic>>()
+                .map<StrategyPerformance>(StrategyPerformance.fromJson)
+                .toList(growable: false)
+          : const <StrategyPerformance>[],
+    );
+  }
+}
+
+class JournalStatistics {
+  const JournalStatistics({
+    required this.signals,
+    required this.trades,
+    required this.active,
+    required this.winRate,
+    required this.averageR,
+    required this.tp1Percent,
+    required this.tp2Percent,
+    required this.stopPercent,
+  });
+
+  final int signals;
+  final int trades;
+  final int active;
+  final double winRate;
+  final double averageR;
+  final double tp1Percent;
+  final double tp2Percent;
+  final double stopPercent;
+
+  factory JournalStatistics.fromSignals(List<RadarSignal> source) {
+    final List<RadarSignal> trades = source
+        .where((RadarSignal signal) => signal.entryTime != null)
+        .toList(growable: false);
+    final List<RadarSignal> finished = trades
+        .where((RadarSignal signal) => !signal.status.isActive)
+        .toList(growable: false);
+    return JournalStatistics(
+      signals: source.length,
+      trades: trades.length,
+      active: source
+          .where((RadarSignal signal) => signal.status.isActive)
+          .length,
+      winRate: _percent(
+        finished.where((RadarSignal signal) => signal.resultR > 0.0).length,
+        finished.length,
+      ),
+      averageR: _average(
+        finished.map<double>((RadarSignal signal) => signal.resultR),
+      ),
+      tp1Percent: _percent(
+        trades.where((RadarSignal signal) => signal.tp1Time != null).length,
+        trades.length,
+      ),
+      tp2Percent: _percent(
+        trades.where((RadarSignal signal) => signal.tp2Time != null).length,
+        trades.length,
+      ),
+      stopPercent: _percent(
+        trades
+            .where(
+              (RadarSignal signal) => signal.status == SignalStatus.stopped,
+            )
+            .length,
+        trades.length,
+      ),
+    );
+  }
+}
+
+List<FactorPerformance> _factorPerformance(List<RadarSignal> signals) {
+  final Map<String, Bias Function(RadarSignal)> selectors =
+      <String, Bias Function(RadarSignal)>{
+        'RSI': (RadarSignal signal) => signal.rsi >= 55.0
+            ? Bias.bullish
+            : signal.rsi <= 45.0
+            ? Bias.bearish
+            : Bias.neutral,
+        'MACD': (RadarSignal signal) => signal.macd > 0.0
+            ? Bias.bullish
+            : signal.macd < 0.0
+            ? Bias.bearish
+            : Bias.neutral,
+        'EMA': (RadarSignal signal) {
+          if (signal.ema20 > signal.ema50 && signal.ema50 > signal.ema200) {
+            return Bias.bullish;
+          }
+          if (signal.ema20 < signal.ema50 && signal.ema50 < signal.ema200) {
+            return Bias.bearish;
+          }
+          return Bias.neutral;
+        },
+        'RVOL': (RadarSignal signal) => signal.rvolBias,
+        'BOS/CHOCH': (RadarSignal signal) =>
+            signal.choch == Bias.neutral ? signal.bos : signal.choch,
+        'FVG': (RadarSignal signal) => signal.fvgBias,
+        'Order Block': (RadarSignal signal) => signal.orderBlockBias,
+        'Liquidity Sweep': (RadarSignal signal) => signal.liquidityBias,
+      };
+
+  return selectors.entries
+      .map<FactorPerformance>((
+        MapEntry<String, Bias Function(RadarSignal)> entry,
+      ) {
+        final List<RadarSignal> aligned = signals
+            .where((RadarSignal signal) {
+              final Bias factorBias = entry.value(signal);
+              return factorBias != Bias.neutral &&
+                  factorBias == signal.direction.bias;
+            })
+            .toList(growable: false);
+        return FactorPerformance(
+          name: entry.key,
+          trades: aligned.length,
+          winRate: _percent(
+            aligned.where((RadarSignal signal) => signal.resultR > 0.0).length,
+            aligned.length,
+          ),
+          averageR: _average(
+            aligned.map<double>((RadarSignal signal) => signal.resultR),
+          ),
+        );
+      })
+      .toList(growable: false);
+}
+
+List<StrategyPerformance> _strategyPerformance(List<RadarSignal> source) {
+  return SignalStyle.values
+      .map<StrategyPerformance>((SignalStyle style) {
+        final List<RadarSignal> signals = source
+            .where((RadarSignal signal) => signal.style == style)
+            .toList(growable: false);
+        final List<RadarSignal> trades = signals
+            .where((RadarSignal signal) => signal.entryTime != null)
+            .toList(growable: false);
+        final List<RadarSignal> finished = trades
+            .where((RadarSignal signal) => !signal.status.isActive)
+            .toList(growable: false);
+        final double grossProfit = finished
+            .where((RadarSignal signal) => signal.resultR > 0.0)
+            .fold<double>(
+              0.0,
+              (double sum, RadarSignal signal) => sum + signal.resultR,
+            );
+        final double grossLoss = finished
+            .where((RadarSignal signal) => signal.resultR < 0.0)
+            .fold<double>(
+              0.0,
+              (double sum, RadarSignal signal) => sum + signal.resultR.abs(),
+            );
+        return StrategyPerformance(
+          style: style,
+          signals: signals.length,
+          trades: trades.length,
+          winRate: _percent(
+            finished.where((RadarSignal signal) => signal.resultR > 0.0).length,
+            finished.length,
+          ),
+          averageR: _average(
+            finished.map<double>((RadarSignal signal) => signal.resultR),
+          ),
+          profitFactor: grossLoss == 0.0
+              ? grossProfit
+              : grossProfit / grossLoss,
+        );
+      })
+      .toList(growable: false);
+}
+
+T _enumByName<T extends Enum>(List<T> values, Object? raw, T fallback) {
+  final String name = raw?.toString() ?? '';
+  for (final T value in values) {
+    if (value.name == name) {
+      return value;
+    }
+  }
+  return fallback;
+}
+
+double _average(Iterable<double> values) {
+  double sum = 0.0;
+  int count = 0;
+  for (final double value in values) {
+    sum += value;
+    count++;
+  }
+  return count == 0 ? 0.0 : sum / count;
+}
+
+double _percent(int part, int total) {
+  return total == 0 ? 0.0 : part / total * 100.0;
+}
+
+double _asDouble(Object? value) {
+  return double.tryParse(value?.toString() ?? '') ?? 0.0;
+}
+
+int _asInt(Object? value) {
+  return int.tryParse(value?.toString() ?? '') ?? 0;
+}
