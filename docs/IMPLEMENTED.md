@@ -72,6 +72,16 @@ Last updated: 2026-08-26
 - Trading engines, Journal persistence/tracking, entry/stop calculations and Backtest logic were not changed by this UI phase.
 - Verification: `flutter analyze` clean; all 27 tests passed, including a narrow-screen shell test; desktop navigation, asset workspace, chart, Journal details, Research, RU/EN and Dark/Light were visually checked without browser errors.
 
+## DONE — Dynamic Crypto Universe + Asset Explorer
+
+- Public Bybit instruments/tickers now build the USDT Perpetual universe dynamically instead of using a permanent hardcoded asset list.
+- Added Favorites, Top Liquid, Top Alts, Meme Coins, High Volatility and All categories, plus search and sorting.
+- Asset Explorer shows price, 24h change, volume, turnover, volatility and honest fast/full-analysis states. Full SignalEngine analysis remains scoped to the selected asset workspace.
+- Favorites and the last successful universe response are cached locally; missing network data produces a recoverable error without clearing valid cached assets.
+- Selecting any supported asset opens a symbol-isolated Workspace; Scanner remains separate.
+- Verification: `flutter analyze` clean; all 31 tests passed; Chrome debug launch succeeded; live public Bybit response contained 732 trading USDT Perpetual instruments at verification time.
+- Git recovery point: `958f65c` (`add dynamic crypto universe and asset explorer`).
+
 ## TODO
 
 - Phase 3: deeper Market Structure Engine 2.0 and correction/BOS/CHOCH event history.
@@ -83,7 +93,8 @@ Last updated: 2026-08-26
 - Alert delivery and alert deduplication remain deferred to the alerts phase.
 - Advanced chart roadmap: Volume Profile, Footprint/Clusters, Heatmap, Order Flow, Replay, Journal trade overlays and Backtest replay.
 - Remaining UI depth: configurable Assets/Favorites/Opportunity Queue, real Alerts/News feeds, persisted UI preferences, Mistakes/Review editing and complete localization of legacy engine-generated explanation text.
-- Phases 7–15: see `CRYPTO_RADAR_ROADMAP.md`.
+- Deferred final product layer: About Crypto Radar, centralized `ProductLinksConfig`, separately modelled Official Telegram and External Signal Sources, About & Support, sidebar links and local Help Center. UI/config only; no payments, accounts, licences or commercial backend.
+- Phases 7–16: see `CRYPTO_RADAR_ROADMAP.md`.
 
 ## Safety notes
 

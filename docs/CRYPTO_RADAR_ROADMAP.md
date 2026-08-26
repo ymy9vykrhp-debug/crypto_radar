@@ -17,7 +17,7 @@ This document is the compact, durable project master plan. Changes are delivered
 
 `Market Data -> Indicators -> Structure -> Levels -> Regime -> Strategy -> Decision -> Risk -> Journal/Tracker -> Backtest/Statistics -> Explanation`
 
-Supported now for trading analysis: BTCUSDT and FARTCOINUSDT; 1m, 5m, 15m, 1h. The chart also supports visual-only 4h history. A later data phase may promote 4h into explicitly tested trading rules and add configurable symbols/timeframes.
+Supported now: a dynamic public Bybit USDT Perpetual universe with one selected asset per workspace; 1m, 5m, 15m and 1h trading analysis; visual-only 4h chart history. Historical Backtest remains deliberately limited to BTCUSDT and FARTCOINUSDT until broader validation is implemented.
 
 ## Architecture
 
@@ -47,6 +47,22 @@ Supported now for trading analysis: BTCUSDT and FARTCOINUSDT; 1m, 5m, 15m, 1h. T
 13. **Macro/cross-market:** correlations, risk-on/off, divergence and lead/lag.
 14. **External views/alerts:** TradingView and Telegram after strategy stability.
 15. **Execution discussion only:** Bybit orders may be considered after all safety gates and explicit user approval.
+16. **Product / Support / Official Links (deferred, after the active delivery queue):** prepare non-commercial product identity, official-link configuration and local Help Center UI without payments, accounts or trading access.
+
+### Deferred Phase 16 scope — Product / Support / Official Links
+
+- Add an **About Crypto Radar** view with Version, Build, Strategy Version and Data Engine Version.
+- Add **Official Links** entries for Official Telegram Signals, Telegram Community, Support, Website, Documentation, Changelog and Contact Developer.
+- Keep two independent Telegram domains:
+  - **Official Crypto Radar Telegram:** future first-party signals, updates, notifications and community links.
+  - **External Signal Sources:** third-party inputs that follow `Parser -> Radar Analysis -> Filters -> Priority -> Statistics`.
+- Never mix official links and external sources in one table, model or status flow.
+- Introduce one centralized `ProductLinksConfig` containing `websiteUrl`, `telegramSignalsUrl`, `telegramCommunityUrl`, `telegramSupportUrl`, `supportEmail`, `documentationUrl`, `changelogUrl`, `privacyUrl` and `termsUrl`. Widgets must not contain direct product URLs.
+- Missing configuration is safe: the action is disabled, status is `NOT CONFIGURED`, and the application continues normally.
+- Add **About & Support** to Settings and later add a compact sidebar footer: `Crypto Radar`, `v0.x Beta`, Help, Telegram and Support.
+- Prepare local Help Center navigation for Getting Started, How Signals Work, Risk Management, Bybit Demo Setup, Telegram, FAQ and Contact Support. Unavailable material may be an explicit local placeholder.
+- This phase is UI/config/help architecture only. It must not add payments, subscriptions, licences, login, billing, registration or a commercial backend.
+- Official Telegram links do not grant signal ingestion or order permissions. External Telegram sources remain a later isolated parser/gateway concern and can never place orders directly.
 
 ## Required metrics and records
 
