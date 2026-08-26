@@ -17,7 +17,7 @@ This document is the compact, durable project master plan. Changes are delivered
 
 `Market Data -> Indicators -> Structure -> Levels -> Regime -> Strategy -> Decision -> Risk -> Journal/Tracker -> Backtest/Statistics -> Explanation`
 
-Supported now: BTCUSDT and FARTCOINUSDT; 1m, 5m, 15m, 1h. A later data phase adds 4h and configurable symbols/timeframes.
+Supported now for trading analysis: BTCUSDT and FARTCOINUSDT; 1m, 5m, 15m, 1h. The chart also supports visual-only 4h history. A later data phase may promote 4h into explicitly tested trading rules and add configurable symbols/timeframes.
 
 ## Architecture
 
@@ -39,7 +39,7 @@ Supported now: BTCUSDT and FARTCOINUSDT; 1m, 5m, 15m, 1h. A later data phase add
 5. **Level behaviour:** breakout/rejection scores and candle/volume context.
 6. **Regime and strategy:** regime detector, strategy selector, explicit `NO_TRADE`, entry/risk/stop/target engines.
 7. **Journal/statistics integration:** persist all new context; factor/reason/strategy/regime effectiveness with sample sizes.
-8. **Visual structure:** connected candlestick chart delivered; timeframe heatmap, interaction and deeper event annotations remain.
+8. **Visual structure:** interactive connected chart delivered with 1m/5m/15m/1h/4h, history navigation, crosshair, clean layers, structure/event annotations, indicator subpanels, “ПОЧЕМУ?” highlighting and fullscreen. Advanced Volume Profile, Footprint/Clusters, Heatmap, Order Flow, Replay and Journal/Backtest overlays remain.
 9. **News risk:** high-impact events as a risk filter, never a trade generator.
 10. **Research safety:** fixed train/validation/out-of-sample and guarded profile learning delivered; rolling walk-forward, fees/slippage and what-if remain.
 11. **Paper trading:** virtual balance, positions, fees-ready accounting and equity curve.

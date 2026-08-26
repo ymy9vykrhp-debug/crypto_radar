@@ -49,6 +49,17 @@ Last updated: 2026-08-26
 - Factor evidence shows sample size, confidence and collect/neutral/strengthen/reduce research guidance. It does not silently rewrite `SignalEngine` weights from tiny samples.
 - Verification: `flutter analyze` clean; all 21 tests passed; the local web app loaded live Bybit data and the chart was visually checked without browser errors.
 
+## DONE — Interactive chart workspace
+
+- The chart has its own visual-only data path for 1m/5m/15m/1h/4h history; `SignalEngine`, live decisions, Journal, Tracker and Backtest rules were not changed.
+- Mouse-wheel and button zoom, drag/pan through history, fit, reset, latest-candle return, fullscreen and 100/200/300/500-candle windows.
+- Crosshair and candle tooltip expose time, OHLC, volume, range, body and direction; candle and overlay clicks open contextual details.
+- Clean layer controls for Entry, Stop, TP1/TP2, S/R, Heavy Levels, Liquidity, FVG, Order Blocks, HH/HL/LH/LL, BOS, CHOCH, False Breakout, Sweep, Price Magnet and Expected Move.
+- Visual structure annotations cover confirmed pivots, trend, correction, correction end, continuation and possible reversal without feeding those annotations back into trading decisions.
+- EMA20/50/200 and VWAP overlays plus removable/collapsible Volume, RSI, MACD and ATR panels.
+- “ПОЧЕМУ?” mode highlights only the layers linked to the current immutable decision reason/warning codes and provides direct access to the Decision Snapshot.
+- Verification: `flutter analyze` clean; all 25 tests passed; Chrome interaction smoke-test covered zoom, pan, tooltip, 4h, layers, indicators and fullscreen without browser warnings/errors.
+
 ## TODO
 
 - Phase 3: deeper Market Structure Engine 2.0 and correction/BOS/CHOCH event history.
@@ -58,6 +69,8 @@ Last updated: 2026-08-26
 - Full rolling walk-forward/OOS research, fees and slippage remain required before Paper Trading.
 - A Pine Script mirror may be added after the strategy is stable, but it would recalculate the strategy inside TradingView rather than read local Flutter signals. A licensed Advanced Charts integration is a later deployment option.
 - Alert delivery and alert deduplication remain deferred to the alerts phase.
+- Advanced chart roadmap: Volume Profile, Footprint/Clusters, Heatmap, Order Flow, Replay, Journal trade overlays and Backtest replay.
+- The broader navigation/workspace/theme/localization UI master plan remains a separate follow-up stage.
 - Phases 7–15: see `CRYPTO_RADAR_ROADMAP.md`.
 
 ## Safety notes

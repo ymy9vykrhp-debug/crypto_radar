@@ -196,6 +196,7 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
                       : ChartScreen(
                           snapshot: _snapshot!,
                           journalController: _journalController,
+                          bybitService: _repository,
                         ),
                   JournalScreen(controller: _journalController),
                 ],
