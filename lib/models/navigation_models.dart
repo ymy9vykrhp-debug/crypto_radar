@@ -20,3 +20,5 @@ enum WorkspaceSection {
   journal,
   news,
 }
+
+enum MarketSectionView { explorer, scanner, workspace }
