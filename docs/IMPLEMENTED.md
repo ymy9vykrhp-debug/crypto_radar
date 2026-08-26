@@ -1,6 +1,6 @@
 # Crypto Radar — Implementation Status
 
-Last updated: 2026-08-25
+Last updated: 2026-08-26
 
 ## DONE — Phase 1 stable core
 
@@ -26,12 +26,27 @@ Last updated: 2026-08-25
 - Verification: `flutter analyze` clean; all 10 tests passed; debug web build succeeded; Chrome debug launch connected successfully.
 - Full smoke-backtest completed on 2026-08-25: BTCUSDT 143 signals/trades, 47.6% win rate, +0.06 average R; FARTCOINUSDT 155 signals/trades, 49.0% win rate, 0.00 average R. These moving-window results are diagnostics, not promised performance.
 
+## DONE — Phase A execution quality
+
+- Explicit signal lifecycle: `SETUP_FOUND`, `WAIT_FOR_ZONE`, `WAIT_FOR_TRIGGER`, `ENTRY_CONFIRMED`, `IN_POSITION`, `TP1_HIT`, `TP2_HIT`, `STOPPED`, `CANCELLED`, `EXPIRED`.
+- Confirmed entry is the live default. Aggressive entry remains an explicit comparison mode and never silently replaces the default.
+- `FalseBreakoutEngine` separates a possible pierce from a confirmed reclaim/sweep and requires a later closed candle for confirmation.
+- `StopEngine` places structural invalidation first and adds a dynamic ATR/wick/tick/overshoot buffer. Unsafe distance or poor R:R produces `WAIT` / `NO TRADE`.
+- Separate Direction, Entry, Stop and Risk quality scores are visible in Radar, “ПОЧЕМУ?” and Journal.
+- Tracker persists stop overshoot, approximate time outside the level, reclaim and post-stop TP1/TP2. `STOP_THEN_TARGET` is reported instead of hiding a structurally bad stop.
+- Backtest compares six entry variants and three stop approaches through eight fixed execution profiles. Headline metrics use the primary confirmed-BOS profile instead of mixing all profiles.
+- Each profile exposes a chronological 60/20/20 train/validation/out-of-sample diagnostic with sample size. This is not yet a full walk-forward study or automatic optimizer.
+- Verification: `flutter analyze` clean; all 19 tests passed, including no-lookahead confirmation, false-breakout, reclaim, dynamic buffer, deduplication and stop-then-target cases.
+- Full Phase A smoke-backtest completed for BTCUSDT and FARTCOINUSDT. Results are moving-window diagnostics and do not include exchange fees/slippage.
+
 ## TODO
 
-- Phase 3: Market Structure Engine 2.0 and correction/BOS/CHOCH events.
+- Phase 3: deeper Market Structure Engine 2.0 and correction/BOS/CHOCH event history.
 - Phase 4: scored Heavy Levels, OB, FVG and Liquidity engines.
 - Phase 5: breakout/rejection and candle/volume behaviour.
 - Phase 6: full Market Regime, Strategy Selector and explicit NO TRADE.
+- Full rolling walk-forward/OOS research, fees and slippage remain required before Paper Trading.
+- Alert delivery and alert deduplication remain deferred to the alerts phase.
 - Phases 7–15: see `CRYPTO_RADAR_ROADMAP.md`.
 
 ## Safety notes

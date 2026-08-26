@@ -1,8 +1,10 @@
 import '../models/backtest_models.dart';
+import '../models/execution_models.dart';
 import '../models/market_models.dart';
 import '../models/signal_models.dart';
 import '../services/bybit_service.dart';
 import 'decision_engine.dart';
+import 'phase_a_engine.dart';
 import 'signal_engine.dart';
 import 'trade_tracker.dart';
 
@@ -56,7 +58,8 @@ class BacktestEngine {
 
       // Signals are tracked using only the candle that has just closed.
       for (int signalIndex = 0; signalIndex < signals.length; signalIndex++) {
-        if (signals[signalIndex].status.isActive) {
+        if (signals[signalIndex].status.isActive ||
+            signals[signalIndex].needsPostStopTracking) {
           signals[signalIndex] = tradeTracker.consume(
             signals[signalIndex],
             currentCandle,
@@ -112,43 +115,60 @@ class BacktestEngine {
         hourCandles: hourWindow,
       );
       final bool standardBoundary = baseClose.minute % 15 == 0;
-      final bool standardActive = signals.any(
-        (RadarSignal signal) =>
-            signal.style == SignalStyle.standard && signal.status.isActive,
-      );
-      final bool scalpActive = signals.any(
-        (RadarSignal signal) =>
-            signal.style == SignalStyle.scalp && signal.status.isActive,
-      );
+      for (int signalIndex = 0; signalIndex < signals.length; signalIndex++) {
+        if (signals[signalIndex].status == SignalStatus.waitingEntry) {
+          signals[signalIndex] = PhaseAEngine.update(
+            market: snapshot,
+            signal: signals[signalIndex],
+          );
+        }
+      }
       final List<RadarSignal?> candidates = <RadarSignal?>[
-        if (standardBoundary && !standardActive)
+        if (standardBoundary)
           SignalEngine.createSignal(snapshot, signalTime: baseClose),
-        if (!scalpActive)
-          SignalEngine.createScalpSignal(snapshot, signalTime: baseClose),
+        SignalEngine.createScalpSignal(snapshot, signalTime: baseClose),
       ];
-      for (final RadarSignal? candidate in candidates) {
-        if (candidate == null) {
+      for (final RadarSignal? baseCandidate in candidates) {
+        if (baseCandidate == null) {
           continue;
         }
-        final String setupKey =
-            '${candidate.style.name}:'
-            '${candidate.direction.name}';
-        final DateTime? previousSetupTime = previousSetups[setupKey];
-        final Duration cooldown = candidate.style == SignalStyle.scalp
-            ? const Duration(minutes: 10)
-            : const Duration(hours: 1);
-        final bool repeatedSetup =
-            previousSetupTime != null &&
-            baseClose.difference(previousSetupTime) < cooldown;
-        if (!repeatedSetup) {
-          signals.add(
-            candidate.copyWith(
-              reasonCodes: DecisionEngine.persistedReasonCodesForSignal(
-                candidate,
-              ),
+        for (final ExecutionProfile profile
+            in ExecutionProfile.backtestProfiles) {
+          final bool profileActive = signals.any(
+            (RadarSignal signal) =>
+                signal.style == baseCandidate.style &&
+                signal.executionProfileId == profile.id &&
+                signal.status.isActive,
+          );
+          if (profileActive) {
+            continue;
+          }
+          final RadarSignal enrichedCandidate = baseCandidate.copyWith(
+            reasonCodes: DecisionEngine.persistedReasonCodesForSignal(
+              baseCandidate,
             ),
           );
-          previousSetups[setupKey] = baseClose;
+          final RadarSignal candidate = PhaseAEngine.prepare(
+            market: snapshot,
+            signal: enrichedCandidate,
+            entryVariant: profile.entryVariant,
+            stopVariant: profile.stopVariant,
+            profileId: profile.id,
+          );
+          final String setupKey =
+              '${profile.id}:${candidate.style.name}:'
+              '${candidate.direction.name}';
+          final DateTime? previousSetupTime = previousSetups[setupKey];
+          final Duration cooldown = candidate.style == SignalStyle.scalp
+              ? const Duration(minutes: 10)
+              : const Duration(hours: 1);
+          final bool repeatedSetup =
+              previousSetupTime != null &&
+              baseClose.difference(previousSetupTime) < cooldown;
+          if (!repeatedSetup) {
+            signals.add(candidate);
+            previousSetups[setupKey] = baseClose;
+          }
         }
       }
     }

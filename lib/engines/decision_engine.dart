@@ -1,4 +1,5 @@
 import '../models/decision_models.dart';
+import '../models/execution_models.dart';
 import '../models/market_models.dart';
 import '../models/signal_models.dart';
 
@@ -7,7 +8,10 @@ import '../models/signal_models.dart';
 class DecisionEngine {
   const DecisionEngine._();
 
-  static DecisionSnapshot build(MarketSnapshot market) {
+  static DecisionSnapshot build(
+    MarketSnapshot market, {
+    RadarSignal? executionSignal,
+  }) {
     final TimeframeAnalysis one = market.oneMinute;
     final TimeframeAnalysis five = market.fiveMinutes;
     final TimeframeAnalysis fifteen = market.fifteenMinutes;
@@ -19,19 +23,30 @@ class DecisionEngine {
       _ => DecisionAction.wait,
     };
     final Bias scenarioBias = plan.bias;
-    final EntryDecision entryDecision = _entryDecision(
-      action: action,
-      bias: scenarioBias,
-      price: market.ticker.price,
-      entryLow: plan.entryLow,
-      entryHigh: plan.entryHigh,
-      atr: fifteen.atr,
-    );
+    final double entryLow = executionSignal?.entryLow ?? plan.entryLow;
+    final double entryHigh = executionSignal?.entryHigh ?? plan.entryHigh;
+    final double stopPrice = executionSignal?.stop ?? plan.stop;
+    final double tp1Price = executionSignal?.tp1 ?? plan.tp1;
+    final double tp2Price = executionSignal?.tp2 ?? plan.tp2;
+    final EntryDecision entryDecision = executionSignal == null
+        ? _entryDecision(
+            action: action,
+            bias: scenarioBias,
+            price: market.ticker.price,
+            entryLow: entryLow,
+            entryHigh: entryHigh,
+            atr: fifteen.atr,
+          )
+        : executionSignal.stage == SignalStage.entryConfirmed
+        ? EntryDecision.enterNow
+        : executionSignal.stage == SignalStage.waitForZone
+        ? EntryDecision.waitForZone
+        : EntryDecision.waitForZone;
     final MarketRegimeHint regime = _regime(fifteen.trend, hour.trend);
     final DataQuality dataQuality = _dataQuality(market);
-    final double entryMidpoint = (plan.entryLow + plan.entryHigh) / 2.0;
-    final double risk = (entryMidpoint - plan.stop).abs();
-    final double reward = (plan.tp1 - entryMidpoint).abs();
+    final double entryMidpoint = (entryLow + entryHigh) / 2.0;
+    final double risk = (entryMidpoint - stopPrice).abs();
+    final double reward = (tp1Price - entryMidpoint).abs();
     final double riskReward = risk == 0.0 ? 0.0 : reward / risk;
     final double price = market.ticker.price;
     final double expectedMovePercent = price == 0.0
@@ -217,13 +232,13 @@ class DecisionEngine {
       marketRegime: regime,
       selectedStrategy: 'STANDARD_CONFIRMATION_V1',
       entryDecision: entryDecision,
-      entryLow: plan.entryLow,
-      entryHigh: plan.entryHigh,
-      stop: plan.stop,
-      tp1: plan.tp1,
-      tp2: plan.tp2,
+      entryLow: entryLow,
+      entryHigh: entryHigh,
+      stop: stopPrice,
+      tp1: tp1Price,
+      tp2: tp2Price,
       riskReward: riskReward,
-      leverage: plan.leverage,
+      leverage: executionSignal?.leverage ?? plan.leverage,
       expectedMovePercent: expectedMovePercent,
       priceMagnet: market.magnetPrice,
       timeframeTrends: Map<String, Bias>.unmodifiable(<String, Bias>{
@@ -256,6 +271,18 @@ class DecisionEngine {
       reasonCodes: List<ReasonCode>.unmodifiable(reasons),
       warningCodes: List<ReasonCode>.unmodifiable(warnings),
       invalidationCodes: List<ReasonCode>.unmodifiable(invalidations),
+      signalStage: executionSignal?.stage ?? SignalStage.setupFound,
+      entryMode: executionSignal?.entryMode ?? EntryMode.confirmed,
+      qualityScores: executionSignal?.qualities ?? SignalQualityScores.unrated,
+      falseBreakoutState:
+          executionSignal?.falseBreakoutState ?? FalseBreakoutState.none,
+      falseBreakoutScore: executionSignal?.falseBreakoutScore ?? 0,
+      liquiditySweepConfirmed:
+          executionSignal?.liquiditySweepConfirmed ?? false,
+      invalidationPrice: executionSignal?.invalidationPrice ?? stopPrice,
+      stopBuffer: executionSignal?.stopBuffer ?? 0.0,
+      stopBufferAtr: executionSignal?.stopBufferAtr ?? 0.0,
+      executionAction: executionSignal?.executionAction ?? '',
     );
   }
 

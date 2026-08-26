@@ -1,4 +1,5 @@
 import '../models/decision_models.dart';
+import '../models/execution_models.dart';
 import '../models/market_models.dart';
 
 /// Produces human-readable text from a completed decision contract.
@@ -64,15 +65,18 @@ class ExplanationEngine {
   }
 
   static String _whyDecision(DecisionSnapshot snapshot) {
+    final String execution = snapshot.executionAction.isEmpty
+        ? ''
+        : ' ${snapshot.executionAction}';
     switch (snapshot.decision) {
       case DecisionAction.long:
         return 'Текущий SignalEngine выбрал LONG: преимущество бычьих '
-            'подтверждений достигло рабочего порога. Состояние входа: '
-            '${snapshot.entryDecision.label}.';
+            'подтверждений достигло рабочего порога. Stage: '
+            '${snapshot.signalStage.code}.$execution';
       case DecisionAction.short:
         return 'Текущий SignalEngine выбрал SHORT: преимущество медвежьих '
-            'подтверждений достигло рабочего порога. Состояние входа: '
-            '${snapshot.entryDecision.label}.';
+            'подтверждений достигло рабочего порога. Stage: '
+            '${snapshot.signalStage.code}.$execution';
       case DecisionAction.wait:
         return 'Решение WAIT означает, что разница подтверждений пока не даёт '
             'достаточного преимущества. Это осознанный результат, а не ошибка '
@@ -90,6 +94,16 @@ class ExplanationEngine {
     if (snapshot.entryDecision == EntryDecision.waitForZone) {
       result.add(
         'Возврат цены в зону ${_price(snapshot.entryLow)} — ${_price(snapshot.entryHigh)} без слома сценария.',
+      );
+    }
+    if (snapshot.signalStage == SignalStage.waitForTrigger) {
+      result.add(
+        'Закрытие подтверждающей свечи и структурный BOS/CHOCH после коррекции.',
+      );
+    }
+    if (snapshot.falseBreakoutState == FalseBreakoutState.possible) {
+      result.add(
+        'Возврат под/над пробитый уровень: одиночный прокол ещё не подтверждает false breakout.',
       );
     }
     if (snapshot.entryDecision == EntryDecision.tooLate) {
@@ -115,6 +129,11 @@ class ExplanationEngine {
   static String _entryExplanation(DecisionSnapshot snapshot) {
     final String zone =
         '${_price(snapshot.entryLow)} — ${_price(snapshot.entryHigh)}';
+    if (snapshot.signalStage == SignalStage.waitForTrigger) {
+      return 'Direction уже определён, но вход запрещён. Цена должна завершить '
+          'коррекцию и дать закрытую подтверждающую свечу с BOS/CHOCH, объёмом '
+          'или подтверждённым false breakout + reclaim. Зона: $zone.';
+    }
     switch (snapshot.entryDecision) {
       case EntryDecision.enterNow:
         return 'Текущая цена ${_price(snapshot.price)} находится внутри '
@@ -133,10 +152,11 @@ class ExplanationEngine {
 
   static String _stopExplanation(DecisionSnapshot snapshot) {
     final String side = snapshot.stop < snapshot.entryLow ? 'ниже' : 'выше';
-    return 'Stop ${_price(snapshot.stop)} расположен $side расчётной зоны '
-        'входа с учётом текущей 15м-волатильности. Его пересечение означает '
-        'техническую отмену сценария; улучшенный структурный Stop Engine '
-        'добавляется в следующих фазах.';
+    return 'Structural invalidation ${_price(snapshot.invalidationPrice)}. '
+        'Stop ${_price(snapshot.stop)} расположен $side этой области с '
+        'динамическим buffer ${_price(snapshot.stopBuffer)} '
+        '(${snapshot.stopBufferAtr.toStringAsFixed(2)} ATR). Если безопасный '
+        'Stop делает R:R слабым, Entry Engine оставляет WAIT/NO TRADE.';
   }
 
   static String _targetExplanation(DecisionSnapshot snapshot) {
@@ -361,6 +381,62 @@ class ExplanationEngine {
       ReasonCode.closeBelowSupport => (
         'Пробой поддержки',
         'Закрепление ниже 15м-поддержки отменяет бычье преимущество.',
+      ),
+      ReasonCode.setupFound => (
+        'Setup найден',
+        'Направление определено, но это ещё не разрешение на вход.',
+      ),
+      ReasonCode.entryZoneReached => (
+        'Entry Zone достигнута',
+        'Цена вошла в расчётную зону; теперь требуется триггер.',
+      ),
+      ReasonCode.waitForTrigger => (
+        'Ждём триггер',
+        'Коррекция или структура ещё не подтвердили момент входа.',
+      ),
+      ReasonCode.entryConfirmed => (
+        'Entry подтверждён',
+        'Закрытая свеча и структурные факторы разрешили вход.',
+      ),
+      ReasonCode.confirmedEntry => (
+        'Confirmed Entry',
+        'Используется безопасный режим с ожиданием подтверждения.',
+      ),
+      ReasonCode.aggressiveEntry => (
+        'Aggressive Entry',
+        'Используется ранний вход от зоны для исследовательского сравнения.',
+      ),
+      ReasonCode.falseBreakoutPossible => (
+        'False Breakout возможен',
+        'Уровень проколот, но reclaim и последующая структура ещё не подтверждены.',
+      ),
+      ReasonCode.falseBreakoutConfirmed => (
+        'False Breakout подтверждён',
+        'Цена вернулась за уровень и получила последующее подтверждение структуры.',
+      ),
+      ReasonCode.liquiditySweepConfirmed => (
+        'Liquidity Sweep подтверждён',
+        'Ликвидность за уровнем снята, затем цена вернулась обратно.',
+      ),
+      ReasonCode.reclaimConfirmed => (
+        'Reclaim подтверждён',
+        'Цена закрылась обратно внутри уровня и удержала возврат.',
+      ),
+      ReasonCode.correctionEnded => (
+        'Коррекция завершена',
+        'Локальная структура снова совпала с основным направлением.',
+      ),
+      ReasonCode.safeStopTooFar => (
+        'Безопасный Stop слишком далеко',
+        'Технический Stop с buffer делает риск неприемлемым.',
+      ),
+      ReasonCode.dynamicStopBuffer => (
+        'Dynamic Stop Buffer',
+        'К структурной отмене добавлен ATR/wick buffer.',
+      ),
+      ReasonCode.stopThenTarget => (
+        'Stop → Target',
+        'После Stop рынок всё же достиг исходной цели; это учитывается отдельно.',
       ),
     };
     return DecisionReason(

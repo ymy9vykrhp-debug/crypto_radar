@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../engines/decision_engine.dart';
 import '../engines/explanation_engine.dart';
+import '../engines/phase_a_engine.dart';
+import '../engines/signal_engine.dart';
 import '../models/decision_models.dart';
+import '../models/execution_models.dart';
 import '../models/market_models.dart';
+import '../models/signal_models.dart';
 
 class WhyNowScreen extends StatelessWidget {
   const WhyNowScreen({super.key, required this.marketSnapshot});
@@ -12,7 +16,14 @@ class WhyNowScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final DecisionSnapshot decision = DecisionEngine.build(marketSnapshot);
+    final RadarSignal? rawSignal = SignalEngine.createSignal(marketSnapshot);
+    final RadarSignal? executionSignal = rawSignal == null
+        ? null
+        : PhaseAEngine.preview(market: marketSnapshot, signal: rawSignal);
+    final DecisionSnapshot decision = DecisionEngine.build(
+      marketSnapshot,
+      executionSignal: executionSignal,
+    );
     final DecisionExplanation explanation = ExplanationEngine.explain(decision);
     final Color decisionColor = _decisionColor(decision.decision);
 
@@ -80,6 +91,43 @@ class WhyNowScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
+        _ExplanationSection(
+          title: 'Direction / Entry / Stop Quality',
+          icon: Icons.verified_outlined,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                'Stage: ${decision.signalStage.code} • '
+                '${decision.entryMode.label}',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Direction ${decision.qualityScores.direction}/100 • '
+                'Entry ${decision.qualityScores.entry}/100 • '
+                'Stop ${decision.qualityScores.stop}/100 • '
+                'Risk ${decision.qualityScores.risk}/100 '
+                '(${decision.qualityScores.riskLabel})',
+              ),
+              const SizedBox(height: 8),
+              Text(
+                decision.executionAction.isEmpty
+                    ? 'Setup ещё не сформирован.'
+                    : decision.executionAction,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'False Breakout: ${decision.falseBreakoutState.code} '
+                '${decision.falseBreakoutScore}/100 • '
+                'Sweep: '
+                '${decision.liquiditySweepConfirmed ? 'CONFIRMED' : 'NO'}',
+                style: const TextStyle(color: Colors.white60),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
         _ExplanationSection(
           title: 'Что происходит',
           icon: Icons.public_rounded,

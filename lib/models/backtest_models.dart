@@ -1,4 +1,5 @@
 import 'market_models.dart';
+import 'execution_models.dart';
 import 'signal_models.dart';
 
 class FactorPerformance {
@@ -73,6 +74,96 @@ class StrategyPerformance {
   }
 }
 
+class ExecutionPerformance {
+  const ExecutionPerformance({
+    required this.profileId,
+    required this.label,
+    required this.entryVariant,
+    required this.stopVariant,
+    required this.signals,
+    required this.trades,
+    required this.winRate,
+    required this.averageR,
+    required this.profitFactor,
+    required this.maxDrawdownR,
+    required this.stopThenTargetPercent,
+    required this.trainTrades,
+    required this.trainAverageR,
+    required this.validationTrades,
+    required this.validationAverageR,
+    required this.outOfSampleTrades,
+    required this.outOfSampleAverageR,
+  });
+
+  final String profileId;
+  final String label;
+  final EntryVariant entryVariant;
+  final StopVariant stopVariant;
+  final int signals;
+  final int trades;
+  final double winRate;
+  final double averageR;
+  final double profitFactor;
+  final double maxDrawdownR;
+  final double stopThenTargetPercent;
+  final int trainTrades;
+  final double trainAverageR;
+  final int validationTrades;
+  final double validationAverageR;
+  final int outOfSampleTrades;
+  final double outOfSampleAverageR;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'profileId': profileId,
+    'label': label,
+    'entryVariant': entryVariant.name,
+    'stopVariant': stopVariant.name,
+    'signals': signals,
+    'trades': trades,
+    'winRate': winRate,
+    'averageR': averageR,
+    'profitFactor': profitFactor,
+    'maxDrawdownR': maxDrawdownR,
+    'stopThenTargetPercent': stopThenTargetPercent,
+    'trainTrades': trainTrades,
+    'trainAverageR': trainAverageR,
+    'validationTrades': validationTrades,
+    'validationAverageR': validationAverageR,
+    'outOfSampleTrades': outOfSampleTrades,
+    'outOfSampleAverageR': outOfSampleAverageR,
+  };
+
+  factory ExecutionPerformance.fromJson(Map<String, dynamic> json) {
+    return ExecutionPerformance(
+      profileId: json['profileId']?.toString() ?? '',
+      label: json['label']?.toString() ?? '',
+      entryVariant: enumByName(
+        EntryVariant.values,
+        json['entryVariant'],
+        EntryVariant.bosConfirmation,
+      ),
+      stopVariant: enumByName(
+        StopVariant.values,
+        json['stopVariant'],
+        StopVariant.structuralAtr,
+      ),
+      signals: _asInt(json['signals']),
+      trades: _asInt(json['trades']),
+      winRate: _asDouble(json['winRate']),
+      averageR: _asDouble(json['averageR']),
+      profitFactor: _asDouble(json['profitFactor']),
+      maxDrawdownR: _asDouble(json['maxDrawdownR']),
+      stopThenTargetPercent: _asDouble(json['stopThenTargetPercent']),
+      trainTrades: _asInt(json['trainTrades']),
+      trainAverageR: _asDouble(json['trainAverageR']),
+      validationTrades: _asInt(json['validationTrades']),
+      validationAverageR: _asDouble(json['validationAverageR']),
+      outOfSampleTrades: _asInt(json['outOfSampleTrades']),
+      outOfSampleAverageR: _asDouble(json['outOfSampleAverageR']),
+    );
+  }
+}
+
 class BacktestReport {
   const BacktestReport({
     required this.symbol,
@@ -90,8 +181,12 @@ class BacktestReport {
     required this.averageMovePercent,
     required this.averageTradeMinutes,
     required this.factors,
+    this.stopThenTp1Percent = 0.0,
+    this.stopThenTp2Percent = 0.0,
+    this.averageStopOvershootAtr = 0.0,
     this.strategies = const <StrategyPerformance>[],
     this.reasonCodes = const <FactorPerformance>[],
+    this.executionComparisons = const <ExecutionPerformance>[],
   });
 
   final String symbol;
@@ -108,9 +203,13 @@ class BacktestReport {
   final double maxDrawdownR;
   final double averageMovePercent;
   final double averageTradeMinutes;
+  final double stopThenTp1Percent;
+  final double stopThenTp2Percent;
+  final double averageStopOvershootAtr;
   final List<FactorPerformance> factors;
   final List<StrategyPerformance> strategies;
   final List<FactorPerformance> reasonCodes;
+  final List<ExecutionPerformance> executionComparisons;
 
   factory BacktestReport.fromSignals({
     required String symbol,
@@ -118,7 +217,8 @@ class BacktestReport {
     required DateTime finishedAt,
     required List<RadarSignal> source,
   }) {
-    final List<RadarSignal> trades = source
+    final List<RadarSignal> primarySignals = _primarySignals(source);
+    final List<RadarSignal> trades = primarySignals
         .where((RadarSignal signal) => signal.entryTime != null)
         .toList(growable: false);
     final List<RadarSignal> finished = trades
@@ -136,6 +236,9 @@ class BacktestReport {
     final int stops = trades
         .where((RadarSignal signal) => signal.status == SignalStatus.stopped)
         .length;
+    final List<RadarSignal> stoppedSignals = trades
+        .where((RadarSignal signal) => signal.status == SignalStatus.stopped)
+        .toList(growable: false);
     final double grossProfit = finished
         .where((RadarSignal signal) => signal.resultR > 0.0)
         .fold<double>(0.0, (double sum, RadarSignal signal) {
@@ -165,7 +268,7 @@ class BacktestReport {
       symbol: symbol,
       startedAt: startedAt,
       finishedAt: finishedAt,
-      signals: source.length,
+      signals: primarySignals.length,
       trades: trades.length,
       winRate: _percent(winners, finished.length),
       tp1Percent: _percent(tp1Hits, trades.length),
@@ -184,9 +287,21 @@ class BacktestReport {
           return signal.tradeDuration?.inMinutes.toDouble() ?? 0.0;
         }),
       ),
+      stopThenTp1Percent: _percent(
+        stoppedSignals.where((RadarSignal signal) => signal.postStopTp1).length,
+        stoppedSignals.length,
+      ),
+      stopThenTp2Percent: _percent(
+        stoppedSignals.where((RadarSignal signal) => signal.postStopTp2).length,
+        stoppedSignals.length,
+      ),
+      averageStopOvershootAtr: _average(
+        stoppedSignals.map<double>((RadarSignal signal) => signal.overshootAtr),
+      ),
       factors: _factorPerformance(finished),
-      strategies: _strategyPerformance(source),
+      strategies: _strategyPerformance(primarySignals),
       reasonCodes: _reasonCodePerformance(finished),
+      executionComparisons: _executionPerformance(source),
     );
   }
 
@@ -205,6 +320,9 @@ class BacktestReport {
     'maxDrawdownR': maxDrawdownR,
     'averageMovePercent': averageMovePercent,
     'averageTradeMinutes': averageTradeMinutes,
+    'stopThenTp1Percent': stopThenTp1Percent,
+    'stopThenTp2Percent': stopThenTp2Percent,
+    'averageStopOvershootAtr': averageStopOvershootAtr,
     'factors': factors
         .map<Map<String, Object?>>(
           (FactorPerformance factor) => factor.toJson(),
@@ -220,12 +338,18 @@ class BacktestReport {
           (FactorPerformance reason) => reason.toJson(),
         )
         .toList(growable: false),
+    'executionComparisons': executionComparisons
+        .map<Map<String, Object?>>(
+          (ExecutionPerformance comparison) => comparison.toJson(),
+        )
+        .toList(growable: false),
   };
 
   factory BacktestReport.fromJson(Map<String, dynamic> json) {
     final Object? rawFactors = json['factors'];
     final Object? rawStrategies = json['strategies'];
     final Object? rawReasonCodes = json['reasonCodes'];
+    final Object? rawExecutionComparisons = json['executionComparisons'];
     return BacktestReport(
       symbol: json['symbol']?.toString() ?? '',
       startedAt:
@@ -245,6 +369,9 @@ class BacktestReport {
       maxDrawdownR: _asDouble(json['maxDrawdownR']),
       averageMovePercent: _asDouble(json['averageMovePercent']),
       averageTradeMinutes: _asDouble(json['averageTradeMinutes']),
+      stopThenTp1Percent: _asDouble(json['stopThenTp1Percent']),
+      stopThenTp2Percent: _asDouble(json['stopThenTp2Percent']),
+      averageStopOvershootAtr: _asDouble(json['averageStopOvershootAtr']),
       factors: rawFactors is List<dynamic>
           ? rawFactors
                 .whereType<Map<String, dynamic>>()
@@ -263,6 +390,12 @@ class BacktestReport {
                 .map<FactorPerformance>(FactorPerformance.fromJson)
                 .toList(growable: false)
           : const <FactorPerformance>[],
+      executionComparisons: rawExecutionComparisons is List<dynamic>
+          ? rawExecutionComparisons
+                .whereType<Map<String, dynamic>>()
+                .map<ExecutionPerformance>(ExecutionPerformance.fromJson)
+                .toList(growable: false)
+          : const <ExecutionPerformance>[],
     );
   }
 }
@@ -277,6 +410,8 @@ class JournalStatistics {
     required this.tp1Percent,
     required this.tp2Percent,
     required this.stopPercent,
+    required this.stopThenTargetPercent,
+    required this.averageStopOvershootAtr,
   });
 
   final int signals;
@@ -287,6 +422,8 @@ class JournalStatistics {
   final double tp1Percent;
   final double tp2Percent;
   final double stopPercent;
+  final double stopThenTargetPercent;
+  final double averageStopOvershootAtr;
 
   factory JournalStatistics.fromSignals(List<RadarSignal> source) {
     final List<RadarSignal> trades = source
@@ -294,6 +431,9 @@ class JournalStatistics {
         .toList(growable: false);
     final List<RadarSignal> finished = trades
         .where((RadarSignal signal) => !signal.status.isActive)
+        .toList(growable: false);
+    final List<RadarSignal> stopped = trades
+        .where((RadarSignal signal) => signal.status == SignalStatus.stopped)
         .toList(growable: false);
     return JournalStatistics(
       signals: source.length,
@@ -323,6 +463,13 @@ class JournalStatistics {
             )
             .length,
         trades.length,
+      ),
+      stopThenTargetPercent: _percent(
+        stopped.where((RadarSignal signal) => signal.stopThenTarget).length,
+        stopped.length,
+      ),
+      averageStopOvershootAtr: _average(
+        stopped.map<double>((RadarSignal signal) => signal.overshootAtr),
       ),
     );
   }
@@ -422,6 +569,123 @@ List<StrategyPerformance> _strategyPerformance(List<RadarSignal> source) {
           profitFactor: grossLoss == 0.0
               ? grossProfit
               : grossProfit / grossLoss,
+        );
+      })
+      .toList(growable: false);
+}
+
+List<RadarSignal> _primarySignals(List<RadarSignal> source) {
+  final String primaryId = ExecutionProfile.backtestProfiles
+      .firstWhere((ExecutionProfile profile) => profile.isPrimary)
+      .id;
+  final List<RadarSignal> primary = source
+      .where((RadarSignal signal) => signal.executionProfileId == primaryId)
+      .toList(growable: false);
+  if (primary.isNotEmpty) {
+    return primary;
+  }
+  final List<RadarSignal> live = source
+      .where(
+        (RadarSignal signal) => signal.executionProfileId == 'live_confirmed',
+      )
+      .toList(growable: false);
+  return live.isNotEmpty ? live : source;
+}
+
+List<ExecutionPerformance> _executionPerformance(List<RadarSignal> source) {
+  return ExecutionProfile.backtestProfiles
+      .map<ExecutionPerformance>((ExecutionProfile profile) {
+        final List<RadarSignal> signals = source
+            .where(
+              (RadarSignal signal) => signal.executionProfileId == profile.id,
+            )
+            .toList(growable: false);
+        final List<RadarSignal> trades = signals
+            .where((RadarSignal signal) => signal.entryTime != null)
+            .toList(growable: false);
+        final List<RadarSignal> finished = trades
+            .where((RadarSignal signal) => !signal.status.isActive)
+            .toList(growable: false);
+        final List<RadarSignal> stopped = trades
+            .where(
+              (RadarSignal signal) => signal.status == SignalStatus.stopped,
+            )
+            .toList(growable: false);
+        final List<RadarSignal> chronological = List<RadarSignal>.of(finished)
+          ..sort(
+            (RadarSignal first, RadarSignal second) =>
+                first.time.compareTo(second.time),
+          );
+        final int trainEnd = (chronological.length * 0.60).floor();
+        final int validationEnd = (chronological.length * 0.80).floor();
+        final List<RadarSignal> train = chronological.sublist(0, trainEnd);
+        final List<RadarSignal> validation = chronological.sublist(
+          trainEnd,
+          validationEnd,
+        );
+        final List<RadarSignal> outOfSample = chronological.sublist(
+          validationEnd,
+        );
+        final double grossProfit = finished
+            .where((RadarSignal signal) => signal.resultR > 0.0)
+            .fold<double>(
+              0.0,
+              (double total, RadarSignal signal) => total + signal.resultR,
+            );
+        final double grossLoss = finished
+            .where((RadarSignal signal) => signal.resultR < 0.0)
+            .fold<double>(
+              0.0,
+              (double total, RadarSignal signal) =>
+                  total + signal.resultR.abs(),
+            );
+        double equity = 0.0;
+        double peak = 0.0;
+        double maximumDrawdown = 0.0;
+        for (final RadarSignal signal in finished) {
+          equity += signal.resultR;
+          if (equity > peak) {
+            peak = equity;
+          }
+          final double drawdown = peak - equity;
+          if (drawdown > maximumDrawdown) {
+            maximumDrawdown = drawdown;
+          }
+        }
+        return ExecutionPerformance(
+          profileId: profile.id,
+          label: profile.label,
+          entryVariant: profile.entryVariant,
+          stopVariant: profile.stopVariant,
+          signals: signals.length,
+          trades: trades.length,
+          winRate: _percent(
+            finished.where((RadarSignal signal) => signal.resultR > 0.0).length,
+            finished.length,
+          ),
+          averageR: _average(
+            finished.map<double>((RadarSignal signal) => signal.resultR),
+          ),
+          profitFactor: grossLoss == 0.0
+              ? grossProfit
+              : grossProfit / grossLoss,
+          maxDrawdownR: maximumDrawdown,
+          stopThenTargetPercent: _percent(
+            stopped.where((RadarSignal signal) => signal.stopThenTarget).length,
+            stopped.length,
+          ),
+          trainTrades: train.length,
+          trainAverageR: _average(
+            train.map<double>((RadarSignal signal) => signal.resultR),
+          ),
+          validationTrades: validation.length,
+          validationAverageR: _average(
+            validation.map<double>((RadarSignal signal) => signal.resultR),
+          ),
+          outOfSampleTrades: outOfSample.length,
+          outOfSampleAverageR: _average(
+            outOfSample.map<double>((RadarSignal signal) => signal.resultR),
+          ),
         );
       })
       .toList(growable: false);

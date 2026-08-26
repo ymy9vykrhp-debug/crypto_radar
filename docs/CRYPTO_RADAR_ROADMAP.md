@@ -33,6 +33,7 @@ Supported now: BTCUSDT and FARTCOINUSDT; 1m, 5m, 15m, 1h. A later data phase add
 
 1. **Stable core:** Journal, unique signal identity, Trade Tracker, MFE/MAE/timing/R, Backtest, no-lookahead tests.
 2. **Explainable decision:** `DecisionSnapshot`, stable reason/warning/invalidation codes, local `ExplanationEngine`, “ПОЧЕМУ?” UI.
+   - **Phase A execution-quality gate (completed):** staged confirmation, false-breakout/reclaim analysis, structural buffered stops, entry/stop/risk quality, stop-then-target tracking and fixed execution-profile comparison.
 3. **Market Structure 2.0:** pivots, HH/HL/LH/LL sequence, confirmed BOS/CHOCH events, impulse/correction state.
 4. **Heavy Levels:** scored S/R, Order Blocks, FVG, liquidity pools/sweeps and price magnet.
 5. **Level behaviour:** breakout/rejection scores and candle/volume context.
@@ -51,6 +52,8 @@ Supported now: BTCUSDT and FARTCOINUSDT; 1m, 5m, 15m, 1h. A later data phase add
 
 Journal signals retain direction, entry/stop/targets, score, leverage, multi-timeframe context, indicators, structure, levels, regime/strategy and reason codes. Tracker statuses cover waiting, entered, TP1, TP2, stop, cancel/expiry. Backtest reports signals/trades, win rate, TP1/TP2/stop, average R, profit factor, drawdown, MFE/MAE, movement and timing; later phases add equity curves and deeper slicing.
 
+Phase A also retains entry/stop variants, four quality scores, structural invalidation, dynamic stop buffer, false-breakout state, sweep/reclaim evidence, stop overshoot and `STOP_THEN_TARGET`. Fixed-profile reports include chronological train/validation/OOS slices with sample sizes. These slices are diagnostic only; rolling walk-forward, fees and slippage remain later research gates.
+
 ## Verification gate
 
 After every phase:
@@ -60,4 +63,3 @@ After every phase:
 3. Run all tests, especially no-lookahead and ambiguous TP/stop ordering.
 4. Build or launch Chrome and inspect existing tabs/layout.
 5. Update `docs/IMPLEMENTED.md` with DONE / IN PROGRESS / TODO.
-

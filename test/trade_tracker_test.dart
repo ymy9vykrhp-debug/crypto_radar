@@ -1,4 +1,5 @@
 import 'package:crypto_radar/engines/trade_tracker.dart';
+import 'package:crypto_radar/models/execution_models.dart';
 import 'package:crypto_radar/models/market_models.dart';
 import 'package:crypto_radar/models/signal_models.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,13 +43,14 @@ void main() {
     expect(signal.resultR, -1.0);
   });
 
-  test('cancels a signal that did not enter in twelve hours', () {
+  test('expires a signal that did not enter in twelve hours', () {
     RadarSignal signal = _signal(start);
     signal = tracker.consume(
       signal,
       _candle(start.add(const Duration(hours: 13)), 110.0, 111.0),
     );
-    expect(signal.status, SignalStatus.cancelled);
+    expect(signal.status, SignalStatus.expired);
+    expect(signal.stage, SignalStage.expired);
     expect(signal.entryTime, isNull);
   });
 
@@ -58,7 +60,7 @@ void main() {
       signal,
       _candle(start.add(const Duration(minutes: 15)), 110.0, 111.0),
     );
-    expect(signal.status, SignalStatus.cancelled);
+    expect(signal.status, SignalStatus.expired);
   });
 
   test('builds 1:1, 1:3, 1:5 and 1:9 probability options', () {
@@ -112,6 +114,8 @@ RadarSignal _signal(DateTime time, {SignalStyle style = SignalStyle.standard}) {
     choch: Bias.neutral,
     leverage: 10,
     lastTrackedCandleTime: time,
+    stage: SignalStage.entryConfirmed,
+    entryConfirmedTime: time,
   );
 }
 

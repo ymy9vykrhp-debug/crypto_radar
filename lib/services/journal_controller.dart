@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 
 import '../engines/backtest_engine.dart';
 import '../engines/decision_engine.dart';
+import '../engines/phase_a_engine.dart';
 import '../engines/signal_engine.dart';
 import '../engines/trade_tracker.dart';
 import '../models/backtest_models.dart';
@@ -64,16 +67,20 @@ class JournalController extends ChangeNotifier {
     bool changed = false;
     for (int index = 0; index < _signals.length; index++) {
       final RadarSignal signal = _signals[index];
-      if (signal.symbol != snapshot.symbol || !signal.status.isActive) {
+      if (signal.symbol != snapshot.symbol ||
+          (!signal.status.isActive && !signal.needsPostStopTracking)) {
         continue;
       }
-      final RadarSignal tracked = tradeTracker.consumeAll(
+      RadarSignal tracked = tradeTracker.consumeAll(
         signal,
         signal.style == SignalStyle.scalp
             ? snapshot.oneMinute.candles
             : snapshot.fiveMinutes.candles,
       );
-      if (!identical(tracked, signal)) {
+      if (tracked.status == SignalStatus.waitingEntry) {
+        tracked = PhaseAEngine.update(market: snapshot, signal: tracked);
+      }
+      if (jsonEncode(tracked.toJson()) != jsonEncode(signal.toJson())) {
         _signals[index] = tracked;
         changed = true;
       }
@@ -90,17 +97,21 @@ class JournalController extends ChangeNotifier {
       final RadarSignal enrichedCandidate = candidate.copyWith(
         reasonCodes: DecisionEngine.persistedReasonCodesForSignal(candidate),
       );
+      final RadarSignal preparedCandidate = PhaseAEngine.prepare(
+        market: snapshot,
+        signal: enrichedCandidate,
+      );
       final bool hasActiveStyle = _signals.any(
         (RadarSignal signal) =>
             signal.symbol == snapshot.symbol &&
-            signal.style == enrichedCandidate.style &&
+            signal.style == preparedCandidate.style &&
             signal.status.isActive,
       );
       final bool alreadySaved = _signals.any(
-        (RadarSignal signal) => signal.id == enrichedCandidate.id,
+        (RadarSignal signal) => signal.id == preparedCandidate.id,
       );
       if (!hasActiveStyle && !alreadySaved) {
-        _signals.insert(0, enrichedCandidate);
+        _signals.insert(0, preparedCandidate);
         changed = true;
       }
     }

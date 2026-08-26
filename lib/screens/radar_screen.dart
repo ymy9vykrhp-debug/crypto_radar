@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../engines/backtest_engine.dart';
+import '../engines/phase_a_engine.dart';
 import '../engines/signal_engine.dart';
+import '../models/execution_models.dart';
 import '../models/market_models.dart';
 import '../models/signal_models.dart';
 import '../services/bybit_service.dart';
@@ -296,11 +298,32 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
   Widget _buildHome(MarketSnapshot snapshot) {
     final TimeframeAnalysis analysis = snapshot.fifteenMinutes;
     final TradePlan plan = snapshot.tradePlan;
-    final RadarSignal? scalpSignal = SignalEngine.createScalpSignal(snapshot);
+    final RadarSignal? rawStandardSignal = SignalEngine.createSignal(snapshot);
+    final RadarSignal? executionSignal = rawStandardSignal == null
+        ? null
+        : PhaseAEngine.preview(market: snapshot, signal: rawStandardSignal);
+    final RadarSignal? rawScalpSignal = SignalEngine.createScalpSignal(
+      snapshot,
+    );
+    final RadarSignal? scalpSignal = rawScalpSignal == null
+        ? null
+        : PhaseAEngine.preview(market: snapshot, signal: rawScalpSignal);
     final bool waiting = snapshot.signal == 'ЖДАТЬ';
-    final String action = waiting
-        ? 'Ждать усиления матрицы подтверждений'
-        : plan.reason;
+    final String action =
+        executionSignal?.executionAction ??
+        (waiting ? 'Ждать усиления матрицы подтверждений' : plan.reason);
+    final TradePlan effectivePlan = executionSignal == null
+        ? plan
+        : TradePlan(
+            bias: executionSignal.direction.bias,
+            entryLow: executionSignal.entryLow,
+            entryHigh: executionSignal.entryHigh,
+            stop: executionSignal.stop,
+            tp1: executionSignal.tp1,
+            tp2: executionSignal.tp2,
+            leverage: executionSignal.leverage,
+            reason: executionSignal.executionAction,
+          );
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: <Widget>[
@@ -327,6 +350,70 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
               ),
             ],
           ),
+        ),
+        const SizedBox(height: 12),
+        _Panel(
+          title: 'Качество входа • Phase A',
+          icon: Icons.verified_outlined,
+          child: executionSignal == null
+              ? const Text(
+                  'Direction пока WAIT: новый торговый Setup не создаётся.',
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Wrap(
+                      spacing: 18,
+                      runSpacing: 10,
+                      children: <Widget>[
+                        _PlanValue(
+                          label: 'Direction',
+                          value:
+                              '${executionSignal.direction.label} '
+                              '${executionSignal.qualities.direction}/100',
+                        ),
+                        _PlanValue(
+                          label: 'Stage',
+                          value: executionSignal.stage.code,
+                        ),
+                        _PlanValue(
+                          label: 'Entry Quality',
+                          value: '${executionSignal.qualities.entry}/100',
+                        ),
+                        _PlanValue(
+                          label: 'Stop Quality',
+                          value: '${executionSignal.qualities.stop}/100',
+                        ),
+                        _PlanValue(
+                          label: 'Risk Quality',
+                          value:
+                              '${executionSignal.qualities.risk}/100 '
+                              '${executionSignal.qualities.riskLabel}',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      executionSignal.executionAction,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color:
+                            executionSignal.stage == SignalStage.entryConfirmed
+                            ? const Color(0xFF62E6A7)
+                            : Colors.amberAccent,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'False Breakout: '
+                      '${executionSignal.falseBreakoutState.code} '
+                      '${executionSignal.falseBreakoutScore}/100 • '
+                      'Stop buffer '
+                      '${executionSignal.stopBufferAtr.toStringAsFixed(2)} ATR',
+                      style: const TextStyle(color: Colors.white60),
+                    ),
+                  ],
+                ),
         ),
         const SizedBox(height: 12),
         _Panel(
@@ -418,7 +505,7 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
           ),
         ),
         const SizedBox(height: 12),
-        _TradePlanCard(plan: plan, signal: snapshot.signal),
+        _TradePlanCard(plan: effectivePlan, signal: snapshot.signal),
         const SizedBox(height: 10),
         Text(
           'Расчёты носят информационный характер и не являются финансовой рекомендацией.',

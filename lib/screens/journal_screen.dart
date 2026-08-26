@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/backtest_models.dart';
+import '../models/execution_models.dart';
 import '../models/market_models.dart';
 import '../models/signal_models.dart';
 import '../services/journal_controller.dart';
@@ -142,17 +143,25 @@ class _StatisticsGrid extends StatelessWidget {
       _MetricData('TP1', '${statistics.tp1Percent.toStringAsFixed(1)}%'),
       _MetricData('TP2', '${statistics.tp2Percent.toStringAsFixed(1)}%'),
       _MetricData('Stop', '${statistics.stopPercent.toStringAsFixed(1)}%'),
+      _MetricData(
+        'Stop→Target',
+        '${statistics.stopThenTargetPercent.toStringAsFixed(1)}%',
+      ),
+      _MetricData(
+        'Overshoot',
+        '${statistics.averageStopOvershootAtr.toStringAsFixed(2)} ATR',
+      ),
     ];
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
-        final int columns = constraints.maxWidth >= 800 ? 8 : 4;
+        final int columns = constraints.maxWidth >= 1100 ? 10 : 5;
         return GridView.count(
           crossAxisCount: columns,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           mainAxisSpacing: 8,
           crossAxisSpacing: 8,
-          childAspectRatio: columns == 8 ? 1.25 : 1.45,
+          childAspectRatio: columns == 10 ? 1.20 : 1.45,
           children: metrics
               .map<Widget>((_MetricData metric) => _MetricTile(data: metric))
               .toList(growable: false),
@@ -272,6 +281,18 @@ class _BacktestCard extends StatelessWidget {
         'Время сделки',
         _duration(Duration(minutes: report.averageTradeMinutes.round())),
       ),
+      _MetricData(
+        'Stop→TP1',
+        '${report.stopThenTp1Percent.toStringAsFixed(1)}%',
+      ),
+      _MetricData(
+        'Stop→TP2',
+        '${report.stopThenTp2Percent.toStringAsFixed(1)}%',
+      ),
+      _MetricData(
+        'Overshoot',
+        '${report.averageStopOvershootAtr.toStringAsFixed(2)} ATR',
+      ),
     ];
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -318,6 +339,20 @@ class _BacktestCard extends StatelessWidget {
             const SizedBox(height: 8),
             for (final StrategyPerformance strategy in report.strategies)
               _StrategyRow(strategy: strategy),
+          ],
+          if (report.executionComparisons.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 16),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Сравнение Entry / Stop Phase A',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+            const SizedBox(height: 8),
+            for (final ExecutionPerformance comparison
+                in report.executionComparisons)
+              _ExecutionRow(comparison: comparison),
           ],
           const SizedBox(height: 16),
           const Align(
@@ -397,6 +432,51 @@ class _FactorRow extends StatelessWidget {
   }
 }
 
+class _ExecutionRow extends StatelessWidget {
+  const _ExecutionRow({required this.comparison});
+
+  final ExecutionPerformance comparison;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            flex: 3,
+            child: Text(
+              comparison.label,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+          Expanded(child: Text('${comparison.trades}/${comparison.signals}')),
+          Expanded(child: Text('${comparison.winRate.toStringAsFixed(1)}% WR')),
+          Expanded(child: Text('${comparison.averageR.toStringAsFixed(2)}R')),
+          Expanded(
+            child: Text('PF ${comparison.profitFactor.toStringAsFixed(2)}'),
+          ),
+          Expanded(
+            child: Text('DD ${comparison.maxDrawdownR.toStringAsFixed(1)}R'),
+          ),
+          Expanded(
+            child: Text(
+              'S→T ${comparison.stopThenTargetPercent.toStringAsFixed(1)}%',
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              'OOS ${comparison.outOfSampleAverageR.toStringAsFixed(2)}R '
+              '(n=${comparison.outOfSampleTrades})',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SignalCard extends StatelessWidget {
   const _SignalCard({required this.signal});
 
@@ -423,9 +503,20 @@ class _SignalCard extends StatelessWidget {
           style: TextStyle(color: directionColor, fontWeight: FontWeight.w900),
         ),
         subtitle: Text('${_dateTime(signal.time)} • score ${signal.score}'),
-        trailing: _StatusBadge(status: signal.status),
+        trailing: _StageBadge(stage: signal.stage),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
         children: <Widget>[
+          _SignalRow(
+            'Стадия / режим',
+            '${signal.stage.code} / ${signal.entryMode.label}',
+          ),
+          _SignalRow('Действие', signal.executionAction),
+          _SignalRow(
+            'Direction / Entry / Stop / Risk',
+            '${signal.qualities.direction} / ${signal.qualities.entry} / '
+                '${signal.qualities.stop} / ${signal.qualities.risk} '
+                '(${signal.qualities.riskLabel})',
+          ),
           _SignalRow(
             'Вход',
             '${_price(signal.entryLow)} — ${_price(signal.entryHigh)}',
@@ -433,6 +524,18 @@ class _SignalCard extends StatelessWidget {
           _SignalRow(
             'Стоп / TP1 / TP2',
             '${_price(signal.stop)} / ${_price(signal.tp1)} / ${_price(signal.tp2)}',
+          ),
+          _SignalRow(
+            'Invalidation / Buffer',
+            '${_price(signal.invalidationPrice)} / '
+                '${_price(signal.stopBuffer)} '
+                '(${signal.stopBufferAtr.toStringAsFixed(2)} ATR)',
+          ),
+          _SignalRow(
+            'False Breakout / Sweep',
+            '${signal.falseBreakoutState.code} '
+                '${signal.falseBreakoutScore}/100 / '
+                '${signal.liquiditySweepConfirmed ? 'CONFIRMED' : 'NO'}',
           ),
           _SignalRow(
             'Тренды 1м / 5м / 15м / 1ч',
@@ -470,6 +573,20 @@ class _SignalCard extends StatelessWidget {
             '${signal.resultR >= 0.0 ? '+' : ''}'
                 '${signal.resultR.toStringAsFixed(2)}R',
           ),
+          if (signal.status == SignalStatus.stopped) ...<Widget>[
+            _SignalRow(
+              'Stop overshoot',
+              '${_price(signal.overshootPoints)} / '
+                  '${signal.overshootPercent.toStringAsFixed(3)}% / '
+                  '${signal.overshootAtr.toStringAsFixed(2)} ATR',
+            ),
+            _SignalRow(
+              'Reclaim / Stop→TP1 / Stop→TP2',
+              '${signal.reclaimedLevel ? 'YES' : 'NO'} / '
+                  '${signal.postStopTp1 ? 'YES' : 'NO'} / '
+                  '${signal.postStopTp2 ? 'YES' : 'NO'}',
+            ),
+          ],
           const Divider(height: 18),
           RiskRewardTable(signal: signal),
         ],
@@ -508,28 +625,21 @@ class _SignalRow extends StatelessWidget {
   }
 }
 
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status});
+class _StageBadge extends StatelessWidget {
+  const _StageBadge({required this.stage});
 
-  final SignalStatus status;
+  final SignalStage stage;
 
   @override
   Widget build(BuildContext context) {
-    final Color color;
-    switch (status) {
-      case SignalStatus.waitingEntry:
-        color = Colors.amberAccent;
-      case SignalStatus.inPosition:
-        color = Colors.lightBlueAccent;
-      case SignalStatus.tp1Hit:
-        color = const Color(0xFF62E6A7);
-      case SignalStatus.tp2Hit:
-        color = const Color(0xFF38D996);
-      case SignalStatus.stopped:
-        color = const Color(0xFFFF667A);
-      case SignalStatus.cancelled:
-        color = Colors.white54;
-    }
+    final Color color = switch (stage) {
+      SignalStage.entryConfirmed => const Color(0xFF62E6A7),
+      SignalStage.inPosition => Colors.lightBlueAccent,
+      SignalStage.tp1Hit || SignalStage.tp2Hit => const Color(0xFF38D996),
+      SignalStage.stopped => const Color(0xFFFF667A),
+      SignalStage.cancelled || SignalStage.expired => Colors.white54,
+      _ => Colors.amberAccent,
+    };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
@@ -537,7 +647,7 @@ class _StatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(99),
       ),
       child: Text(
-        status.code,
+        stage.code,
         style: TextStyle(
           color: color,
           fontSize: 10,

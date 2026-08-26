@@ -15,8 +15,20 @@ Future<void> main() async {
       stdout.writeln(
         '$symbol signals=${report.signals} trades=${report.trades} '
         'winRate=${report.winRate.toStringAsFixed(1)} '
-        'avgR=${report.averageR.toStringAsFixed(2)}',
+        'avgR=${report.averageR.toStringAsFixed(2)} '
+        'stopToTp1=${report.stopThenTp1Percent.toStringAsFixed(1)}%',
       );
+      for (final comparison in report.executionComparisons) {
+        stdout.writeln(
+          '  ${comparison.profileId} trades=${comparison.trades} '
+          'avgR=${comparison.averageR.toStringAsFixed(2)} '
+          'pf=${comparison.profitFactor.toStringAsFixed(2)} '
+          'stopToTarget='
+          '${comparison.stopThenTargetPercent.toStringAsFixed(1)}% '
+          'oos=${comparison.outOfSampleAverageR.toStringAsFixed(2)}R '
+          'n=${comparison.outOfSampleTrades}',
+        );
+      }
     }
   } finally {
     client.close();

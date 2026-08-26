@@ -1,4 +1,5 @@
 import 'market_models.dart';
+import 'execution_models.dart';
 
 enum DecisionAction { long, short, wait }
 
@@ -114,6 +115,20 @@ enum ReasonCode {
   invalidationBelowStop,
   closeAboveResistance,
   closeBelowSupport,
+  setupFound,
+  entryZoneReached,
+  waitForTrigger,
+  entryConfirmed,
+  confirmedEntry,
+  aggressiveEntry,
+  falseBreakoutPossible,
+  falseBreakoutConfirmed,
+  liquiditySweepConfirmed,
+  reclaimConfirmed,
+  correctionEnded,
+  safeStopTooFar,
+  dynamicStopBuffer,
+  stopThenTarget,
 }
 
 extension ReasonCodeWire on ReasonCode {
@@ -213,6 +228,34 @@ extension ReasonCodeWire on ReasonCode {
         return 'CLOSE_ABOVE_RESISTANCE';
       case ReasonCode.closeBelowSupport:
         return 'CLOSE_BELOW_SUPPORT';
+      case ReasonCode.setupFound:
+        return 'SETUP_FOUND';
+      case ReasonCode.entryZoneReached:
+        return 'ENTRY_ZONE_REACHED';
+      case ReasonCode.waitForTrigger:
+        return 'WAIT_FOR_TRIGGER';
+      case ReasonCode.entryConfirmed:
+        return 'ENTRY_CONFIRMED';
+      case ReasonCode.confirmedEntry:
+        return 'CONFIRMED_ENTRY';
+      case ReasonCode.aggressiveEntry:
+        return 'AGGRESSIVE_ENTRY';
+      case ReasonCode.falseBreakoutPossible:
+        return 'FALSE_BREAKOUT_POSSIBLE';
+      case ReasonCode.falseBreakoutConfirmed:
+        return 'FALSE_BREAKOUT_CONFIRMED';
+      case ReasonCode.liquiditySweepConfirmed:
+        return 'LIQUIDITY_SWEEP_CONFIRMED';
+      case ReasonCode.reclaimConfirmed:
+        return 'RECLAIM_CONFIRMED';
+      case ReasonCode.correctionEnded:
+        return 'CORRECTION_ENDED';
+      case ReasonCode.safeStopTooFar:
+        return 'SAFE_STOP_TOO_FAR';
+      case ReasonCode.dynamicStopBuffer:
+        return 'DYNAMIC_STOP_BUFFER';
+      case ReasonCode.stopThenTarget:
+        return 'STOP_THEN_TARGET';
     }
   }
 
@@ -279,6 +322,16 @@ class DecisionSnapshot {
     required this.reasonCodes,
     required this.warningCodes,
     required this.invalidationCodes,
+    this.signalStage = SignalStage.setupFound,
+    this.entryMode = EntryMode.confirmed,
+    this.qualityScores = SignalQualityScores.unrated,
+    this.falseBreakoutState = FalseBreakoutState.none,
+    this.falseBreakoutScore = 0,
+    this.liquiditySweepConfirmed = false,
+    this.invalidationPrice = 0.0,
+    this.stopBuffer = 0.0,
+    this.stopBufferAtr = 0.0,
+    this.executionAction = '',
     this.breakoutScore,
     this.rejectionScore,
     this.newsRisk = 'NOT_CONNECTED',
@@ -324,6 +377,16 @@ class DecisionSnapshot {
   final List<ReasonCode> reasonCodes;
   final List<ReasonCode> warningCodes;
   final List<ReasonCode> invalidationCodes;
+  final SignalStage signalStage;
+  final EntryMode entryMode;
+  final SignalQualityScores qualityScores;
+  final FalseBreakoutState falseBreakoutState;
+  final int falseBreakoutScore;
+  final bool liquiditySweepConfirmed;
+  final double invalidationPrice;
+  final double stopBuffer;
+  final double stopBufferAtr;
+  final String executionAction;
 
   List<String> get persistedReasonCodes => <String>{
     ...reasonCodes.map<String>((ReasonCode reason) => reason.code),
