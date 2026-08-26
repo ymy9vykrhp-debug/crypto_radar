@@ -6,9 +6,12 @@ import '../engines/backtest_engine.dart';
 import '../engines/decision_engine.dart';
 import '../engines/phase_a_engine.dart';
 import '../engines/signal_engine.dart';
+import '../engines/strategy_learning_engine.dart';
 import '../engines/trade_tracker.dart';
 import '../models/backtest_models.dart';
+import '../models/execution_models.dart';
 import '../models/market_models.dart';
+import '../models/learning_models.dart';
 import '../models/signal_models.dart';
 import 'journal_store.dart';
 
@@ -37,6 +40,9 @@ class JournalController extends ChangeNotifier {
   bool get backtestRunning => _backtestRunning;
   String? get error => _error;
   JournalStatistics get statistics => JournalStatistics.fromSignals(_signals);
+  List<LearningAssessment> get learningAssessments => _backtests
+      .map<LearningAssessment>(StrategyLearningEngine.evaluate)
+      .toList(growable: false);
 
   Future<void> initialize() async {
     if (_initialized) {
@@ -97,9 +103,18 @@ class JournalController extends ChangeNotifier {
       final RadarSignal enrichedCandidate = candidate.copyWith(
         reasonCodes: DecisionEngine.persistedReasonCodesForSignal(candidate),
       );
+      final ExecutionProfile? learnedProfile = _approvedProfile(
+        snapshot.symbol,
+      );
       final RadarSignal preparedCandidate = PhaseAEngine.prepare(
         market: snapshot,
         signal: enrichedCandidate,
+        entryVariant:
+            learnedProfile?.entryVariant ?? EntryVariant.bosConfirmation,
+        stopVariant: learnedProfile?.stopVariant ?? StopVariant.structuralAtr,
+        profileId: learnedProfile == null
+            ? 'live_confirmed'
+            : 'learned_${learnedProfile.id}',
       );
       final bool hasActiveStyle = _signals.any(
         (RadarSignal signal) =>
@@ -146,6 +161,15 @@ class JournalController extends ChangeNotifier {
       _backtestRunning = false;
       _notify();
     }
+  }
+
+  ExecutionProfile? _approvedProfile(String symbol) {
+    for (final BacktestReport report in _backtests.reversed) {
+      if (report.symbol == symbol) {
+        return StrategyLearningEngine.approvedProfile(report);
+      }
+    }
+    return null;
   }
 
   void _notify() {

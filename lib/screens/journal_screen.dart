@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/backtest_models.dart';
 import '../models/execution_models.dart';
+import '../models/learning_models.dart';
 import '../models/market_models.dart';
 import '../models/signal_models.dart';
 import '../services/journal_controller.dart';
@@ -35,6 +36,10 @@ class JournalScreen extends StatelessWidget {
             const SizedBox(height: 12),
             _StatisticsGrid(statistics: statistics),
             const SizedBox(height: 12),
+            if (controller.learningAssessments.isNotEmpty) ...<Widget>[
+              _LearningPanel(assessments: controller.learningAssessments),
+              const SizedBox(height: 12),
+            ],
             _Section(
               title: 'Backtest BTCUSDT + FARTCOINUSDT',
               icon: Icons.science_rounded,
@@ -71,6 +76,124 @@ class JournalScreen extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _LearningPanel extends StatelessWidget {
+  const _LearningPanel({required this.assessments});
+
+  final List<LearningAssessment> assessments;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Section(
+      title: 'Strategy Learning • защищённое обучение',
+      icon: Icons.model_training_rounded,
+      child: Column(
+        children: assessments
+            .map<Widget>(_LearningCard.new)
+            .toList(growable: false),
+      ),
+    );
+  }
+}
+
+class _LearningCard extends StatelessWidget {
+  const _LearningCard(this.assessment);
+
+  final LearningAssessment assessment;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color stateColor = assessment.canApplyLive
+        ? const Color(0xFF62E6A7)
+        : const Color(0xFFFFC857);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D1523),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: stateColor.withValues(alpha: 0.28)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Text(
+                assessment.symbol,
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: stateColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  assessment.readiness.code,
+                  style: TextStyle(
+                    color: stateColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${assessment.completedTrades}/${assessment.requiredTrades} сделок',
+                style: const TextStyle(color: Colors.white54),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          LinearProgressIndicator(
+            value: assessment.progress,
+            minHeight: 7,
+            borderRadius: BorderRadius.circular(8),
+            color: stateColor,
+            backgroundColor: Colors.white10,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Исследовательский лидер: ${assessment.researchLeaderLabel} • '
+            'Validation ${assessment.validationAverageR.toStringAsFixed(2)}R '
+            '(n=${assessment.validationTrades}) • '
+            'OOS ${assessment.outOfSampleAverageR.toStringAsFixed(2)}R '
+            '(n=${assessment.outOfSampleTrades})',
+          ),
+          const SizedBox(height: 5),
+          Text(
+            assessment.summary,
+            style: const TextStyle(color: Colors.white60),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: assessment.factors
+                .map<Widget>(
+                  (LearnedFactor factor) => Tooltip(
+                    message:
+                        '${factor.trades} сделок • Average R '
+                        '${factor.averageR.toStringAsFixed(2)} • '
+                        'доверие ${(factor.confidence * 100).toStringAsFixed(0)}%',
+                    child: Chip(
+                      visualDensity: VisualDensity.compact,
+                      label: Text(
+                        '${factor.name}: ${factor.recommendation}',
+                        style: const TextStyle(fontSize: 10),
+                      ),
+                    ),
+                  ),
+                )
+                .toList(growable: false),
+          ),
+        ],
+      ),
     );
   }
 }

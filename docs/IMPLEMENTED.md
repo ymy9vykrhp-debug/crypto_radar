@@ -39,6 +39,16 @@ Last updated: 2026-08-26
 - Verification: `flutter analyze` clean; all 19 tests passed, including no-lookahead confirmation, false-breakout, reclaim, dynamic buffer, deduplication and stop-then-target cases.
 - Full Phase A smoke-backtest completed for BTCUSDT and FARTCOINUSDT. Results are moving-window diagnostics and do not include exchange fees/slippage.
 
+## DONE — Guarded Learning + connected chart
+
+- New `ГРАФИК` tab renders Bybit candles from the same `MarketSnapshot` used by live Radar and `SignalEngine`.
+- Chart overlays EMA20/50, support/resistance, liquidity, FVG/OB zones and the Journal signal's ENTRY zone, STOP, TP1 and TP2. It is analysis-only and cannot place Bybit orders.
+- `StrategyLearningEngine` ranks confirmed execution profiles with confidence shrinkage instead of selecting the highest raw win rate.
+- Automatic adaptation is locked until at least 120 completed trades, 20 validation trades and 30 OOS trades, with positive Average R in both validation and OOS, PF >= 1.20 and bounded drawdown.
+- Aggressive profiles are excluded from automatic live selection. Until the gate passes, `live_confirmed` remains unchanged.
+- Factor evidence shows sample size, confidence and collect/neutral/strengthen/reduce research guidance. It does not silently rewrite `SignalEngine` weights from tiny samples.
+- Verification: `flutter analyze` clean; all 21 tests passed; the local web app loaded live Bybit data and the chart was visually checked without browser errors.
+
 ## TODO
 
 - Phase 3: deeper Market Structure Engine 2.0 and correction/BOS/CHOCH event history.
@@ -46,6 +56,7 @@ Last updated: 2026-08-26
 - Phase 5: breakout/rejection and candle/volume behaviour.
 - Phase 6: full Market Regime, Strategy Selector and explicit NO TRADE.
 - Full rolling walk-forward/OOS research, fees and slippage remain required before Paper Trading.
+- A Pine Script mirror may be added after the strategy is stable, but it would recalculate the strategy inside TradingView rather than read local Flutter signals. A licensed Advanced Charts integration is a later deployment option.
 - Alert delivery and alert deduplication remain deferred to the alerts phase.
 - Phases 7–15: see `CRYPTO_RADAR_ROADMAP.md`.
 

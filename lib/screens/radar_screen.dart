@@ -13,6 +13,7 @@ import '../services/bybit_service.dart';
 import '../services/journal_controller.dart';
 import '../services/journal_store.dart';
 import '../widgets/risk_reward_table.dart';
+import 'chart_screen.dart';
 import 'journal_screen.dart';
 import 'why_now_screen.dart';
 
@@ -138,7 +139,7 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 5,
+      length: 6,
       child: Scaffold(
         appBar: AppBar(
           titleSpacing: 18,
@@ -165,6 +166,7 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
               Tab(text: 'ПОДТВЕРЖДЕНИЯ'),
               Tab(text: 'ДЕТАЛИ'),
               Tab(text: 'ПОЧЕМУ?'),
+              Tab(text: 'ГРАФИК'),
               Tab(text: 'ЖУРНАЛ'),
             ],
           ),
@@ -189,6 +191,12 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
                   _snapshot == null
                       ? _buildEmptyState()
                       : WhyNowScreen(marketSnapshot: _snapshot!),
+                  _snapshot == null
+                      ? _buildEmptyState()
+                      : ChartScreen(
+                          snapshot: _snapshot!,
+                          journalController: _journalController,
+                        ),
                   JournalScreen(controller: _journalController),
                 ],
               ),

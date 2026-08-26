@@ -39,9 +39,9 @@ Supported now: BTCUSDT and FARTCOINUSDT; 1m, 5m, 15m, 1h. A later data phase add
 5. **Level behaviour:** breakout/rejection scores and candle/volume context.
 6. **Regime and strategy:** regime detector, strategy selector, explicit `NO_TRADE`, entry/risk/stop/target engines.
 7. **Journal/statistics integration:** persist all new context; factor/reason/strategy/regime effectiveness with sample sizes.
-8. **Visual structure:** timeframe heatmap and compact annotated chart.
+8. **Visual structure:** connected candlestick chart delivered; timeframe heatmap, interaction and deeper event annotations remain.
 9. **News risk:** high-impact events as a risk filter, never a trade generator.
-10. **Research safety:** what-if, train/validation/out-of-sample, walk-forward, guarded self-analysis.
+10. **Research safety:** fixed train/validation/out-of-sample and guarded profile learning delivered; rolling walk-forward, fees/slippage and what-if remain.
 11. **Paper trading:** virtual balance, positions, fees-ready accounting and equity curve.
 12. **Local Radar Chat:** questions answered only from `DecisionSnapshot`; future LLM is explanation-only.
 13. **Macro/cross-market:** correlations, risk-on/off, divergence and lead/lag.
@@ -53,6 +53,8 @@ Supported now: BTCUSDT and FARTCOINUSDT; 1m, 5m, 15m, 1h. A later data phase add
 Journal signals retain direction, entry/stop/targets, score, leverage, multi-timeframe context, indicators, structure, levels, regime/strategy and reason codes. Tracker statuses cover waiting, entered, TP1, TP2, stop, cancel/expiry. Backtest reports signals/trades, win rate, TP1/TP2/stop, average R, profit factor, drawdown, MFE/MAE, movement and timing; later phases add equity curves and deeper slicing.
 
 Phase A also retains entry/stop variants, four quality scores, structural invalidation, dynamic stop buffer, false-breakout state, sweep/reclaim evidence, stop overshoot and `STOP_THEN_TARGET`. Fixed-profile reports include chronological train/validation/OOS slices with sample sizes. These slices are diagnostic only; rolling walk-forward, fees and slippage remain later research gates.
+
+Guarded learning may change only future confirmed entry/stop profiles after its sample, validation, OOS, profit-factor and drawdown gates all pass. Low-sample factor results are stored as evidence but never auto-promoted. The built-in chart remains the canonical connected visualization because it consumes the exact same local snapshot and signal objects.
 
 ## Verification gate
 
