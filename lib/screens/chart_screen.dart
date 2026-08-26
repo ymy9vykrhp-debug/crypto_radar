@@ -21,11 +21,13 @@ class ChartScreen extends StatefulWidget {
     required this.snapshot,
     required this.journalController,
     required this.bybitService,
+    this.onOpenWhy,
   });
 
   final MarketSnapshot snapshot;
   final JournalController journalController;
   final BybitService bybitService;
+  final VoidCallback? onOpenWhy;
 
   @override
   State<ChartScreen> createState() => _ChartScreenState();
@@ -767,6 +769,10 @@ class _ChartScreenState extends State<ChartScreen> {
     if (hit.kind == ChartHitKind.signal) {
       if (fullscreen) {
         Navigator.of(context).pop();
+      }
+      if (widget.onOpenWhy != null) {
+        widget.onOpenWhy!();
+        return;
       }
       final TabController? tabs = DefaultTabController.maybeOf(this.context);
       if (tabs != null) {

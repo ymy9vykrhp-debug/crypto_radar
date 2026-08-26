@@ -60,6 +60,18 @@ Last updated: 2026-08-26
 - “ПОЧЕМУ?” mode highlights only the layers linked to the current immutable decision reason/warning codes and provides direct access to the Decision Snapshot.
 - Verification: `flutter analyze` clean; all 25 tests passed; Chrome interaction smoke-test covered zoom, pan, tooltip, 4h, layers, indicators and fullscreen without browser warnings/errors.
 
+## DONE — Product UI/UX shell
+
+- Replaced the flat six-tab layout with adaptive desktop navigation and a mobile drawer: Home, Market, Signals, Journal, Research, News, Integrations and Settings.
+- Added a selected-asset workspace with Overview, Chart, Structure, Levels, Volume/Clusters, Signal, Why, Journal and News. Workspace data never mixes symbols.
+- Home now prioritizes decision, action, execution stage, quality scores, regime, strategy, entry/stop/targets, R:R, magnet, expected move, news risk and data quality.
+- Signals and Journal use searchable/filterable/sortable responsive tables; a selected row opens setup, plan, MFE/MAE, overshoot, timeline, errors/review and technical evidence.
+- Heavy Levels, Backtest Results, Strategy Comparison and Factor Statistics use dedicated tables; Research is separated from Journal.
+- Added a separate Alert Center list, honest News/Order Flow placeholders and grouped Settings instead of long switch lists.
+- Introduced shared Material icons, reusable product components, centralized semantic colors, Dark/Light/System themes and a RU/EN localization layer for the product shell.
+- Trading engines, Journal persistence/tracking, entry/stop calculations and Backtest logic were not changed by this UI phase.
+- Verification: `flutter analyze` clean; all 27 tests passed, including a narrow-screen shell test; desktop navigation, asset workspace, chart, Journal details, Research, RU/EN and Dark/Light were visually checked without browser errors.
+
 ## TODO
 
 - Phase 3: deeper Market Structure Engine 2.0 and correction/BOS/CHOCH event history.
@@ -70,7 +82,7 @@ Last updated: 2026-08-26
 - A Pine Script mirror may be added after the strategy is stable, but it would recalculate the strategy inside TradingView rather than read local Flutter signals. A licensed Advanced Charts integration is a later deployment option.
 - Alert delivery and alert deduplication remain deferred to the alerts phase.
 - Advanced chart roadmap: Volume Profile, Footprint/Clusters, Heatmap, Order Flow, Replay, Journal trade overlays and Backtest replay.
-- The broader navigation/workspace/theme/localization UI master plan remains a separate follow-up stage.
+- Remaining UI depth: configurable Assets/Favorites/Opportunity Queue, real Alerts/News feeds, persisted UI preferences, Mistakes/Review editing and complete localization of legacy engine-generated explanation text.
 - Phases 7–15: see `CRYPTO_RADAR_ROADMAP.md`.
 
 ## Safety notes

@@ -39,7 +39,7 @@ Supported now for trading analysis: BTCUSDT and FARTCOINUSDT; 1m, 5m, 15m, 1h. T
 5. **Level behaviour:** breakout/rejection scores and candle/volume context.
 6. **Regime and strategy:** regime detector, strategy selector, explicit `NO_TRADE`, entry/risk/stop/target engines.
 7. **Journal/statistics integration:** persist all new context; factor/reason/strategy/regime effectiveness with sample sizes.
-8. **Visual structure:** interactive connected chart delivered with 1m/5m/15m/1h/4h, history navigation, crosshair, clean layers, structure/event annotations, indicator subpanels, “ПОЧЕМУ?” highlighting and fullscreen. Advanced Volume Profile, Footprint/Clusters, Heatmap, Order Flow, Replay and Journal/Backtest overlays remain.
+8. **Visual structure and product shell:** interactive connected chart delivered with 1m/5m/15m/1h/4h, history navigation, crosshair, clean layers, structure/event annotations, indicator subpanels, “ПОЧЕМУ?” highlighting and fullscreen. Adaptive product navigation, selected-asset workspace, responsive Journal/Signals/Research tables, grouped settings, themes and shell localization are delivered. Advanced Volume Profile, Footprint/Clusters, Heatmap, Order Flow, Replay, Journal/Backtest overlays and remaining localization depth remain.
 9. **News risk:** high-impact events as a risk filter, never a trade generator.
 10. **Research safety:** fixed train/validation/out-of-sample and guarded profile learning delivered; rolling walk-forward, fees/slippage and what-if remain.
 11. **Paper trading:** virtual balance, positions, fees-ready accounting and equity curve.

@@ -1,38 +1,54 @@
 import 'package:flutter/material.dart';
 
+import 'localization/app_strings.dart';
 import 'screens/radar_screen.dart';
+import 'services/app_preferences_controller.dart';
+import 'theme/app_theme.dart';
 
-class CryptoRadarApp extends StatelessWidget {
+class CryptoRadarApp extends StatefulWidget {
   const CryptoRadarApp({super.key, this.autoStart = true});
 
   final bool autoStart;
 
   @override
+  State<CryptoRadarApp> createState() => _CryptoRadarAppState();
+}
+
+class _CryptoRadarAppState extends State<CryptoRadarApp> {
+  late final AppPreferencesController _preferences;
+
+  @override
+  void initState() {
+    super.initState();
+    _preferences = AppPreferencesController();
+  }
+
+  @override
+  void dispose() {
+    _preferences.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final ColorScheme colors = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF62E6A7),
-      brightness: Brightness.dark,
-      surface: const Color(0xFF111827),
-    );
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Crypto Radar',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: colors,
-        scaffoldBackgroundColor: const Color(0xFF080D16),
-        dividerColor: Colors.white12,
-        cardTheme: const CardThemeData(
-          color: Color(0xFF111827),
-          margin: EdgeInsets.zero,
-        ),
-        inputDecorationTheme: const InputDecorationTheme(
-          filled: true,
-          fillColor: Color(0xFF111827),
-          border: OutlineInputBorder(),
-        ),
-      ),
-      home: CryptoRadarHome(autoStart: autoStart),
+    return ListenableBuilder(
+      listenable: _preferences,
+      builder: (BuildContext context, Widget? child) {
+        return AppLocalization(
+          strings: AppStrings(_preferences.language),
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: 'Crypto Radar',
+            theme: AppTheme.light(),
+            darkTheme: AppTheme.dark(),
+            themeMode: _preferences.themeMode,
+            home: CryptoRadarHome(
+              autoStart: widget.autoStart,
+              preferences: _preferences,
+            ),
+          ),
+        );
+      },
     );
   }
 }
