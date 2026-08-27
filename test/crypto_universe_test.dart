@@ -122,6 +122,76 @@ void main() {
       client.close();
     });
 
+    test('keeps snapshots isolated when switching between assets', () async {
+      final MockClient client = MockClient((http.Request request) async {
+        final String symbol =
+            request.url.queryParameters['symbol'] ?? 'BTCUSDT';
+        final double price = symbol == 'ETHUSDT' ? 3200.0 : 0.18;
+        if (request.url.path.endsWith('/kline')) {
+          return _ok(<String, Object?>{
+            'symbol': symbol,
+            'list': _candles(price),
+          });
+        }
+        if (request.url.path.endsWith('/tickers')) {
+          return _ok(<String, Object?>{
+            'list': <Object?>[
+              _ticker(symbol, price: price, turnover: price * 1000000),
+            ],
+          });
+        }
+        return http.Response('not found', 404);
+      });
+      final BybitService service = BybitService(client);
+
+      final MarketSnapshot eth = await service.load('ETHUSDT');
+      final MarketSnapshot fart = await service.load('FARTCOINUSDT');
+
+      expect(eth.symbol, 'ETHUSDT');
+      expect(fart.symbol, 'FARTCOINUSDT');
+      expect(eth.ticker.price, 3200.0);
+      expect(fart.ticker.price, 0.18);
+      expect(eth.fiveMinutes.candles.last.close, isNot(0.18));
+      expect(fart.fiveMinutes.candles.last.close, isNot(3200.0));
+      client.close();
+    });
+
+    test(
+      'rejects empty and invalid Bybit responses without crashing',
+      () async {
+        final MockClient emptyClient = MockClient((http.Request request) async {
+          if (request.url.path.endsWith('/instruments-info')) {
+            return _ok(<String, Object?>{
+              'list': <Object?>[],
+              'nextPageCursor': '',
+            });
+          }
+          return _ok(<String, Object?>{'list': <Object?>[]});
+        });
+        await expectLater(
+          BybitService(emptyClient).loadCryptoUniverse(),
+          throwsA(isA<Exception>()),
+        );
+        emptyClient.close();
+
+        final MockClient invalidClient = MockClient(
+          (http.Request request) async => http.Response(
+            jsonEncode(<String, Object?>{
+              'retCode': 10001,
+              'retMsg': 'symbol invalid',
+              'result': <String, Object?>{},
+            }),
+            200,
+          ),
+        );
+        await expectLater(
+          BybitService(invalidClient).loadCandles('INVALIDUSDT', '5'),
+          throwsA(isA<Exception>()),
+        );
+        invalidClient.close();
+      },
+    );
+
     test(
       'categories, sorting, search, favorites and cache work locally',
       () async {
@@ -293,6 +363,20 @@ Map<String, Object?> _ticker(
   'openInterest': '1250',
   'openInterestValue': '80000000',
 };
+
+List<Object?> _candles(double basePrice) =>
+    List<Object?>.generate(240, (int index) {
+      final double close = basePrice * (1.0 + index / 10000.0);
+      final int timestamp = 1700000000000 - index * 60000;
+      return <Object?>[
+        '$timestamp',
+        '${close * 0.999}',
+        '${close * 1.002}',
+        '${close * 0.998}',
+        '$close',
+        '${1000 + index}',
+      ];
+    });
 
 class _MemoryStorage implements LocalStorageBackend {
   final Map<String, String> values = <String, String>{};
