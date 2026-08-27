@@ -10,6 +10,8 @@ abstract interface class TelegramGateway {
 
   Future<void> sendTest(TelegramRelayConfig config);
 
+  Future<String> discoverChat(TelegramRelayConfig config);
+
   Future<void> sendTradeAlert(TelegramRelayConfig config, TradeAlert alert);
 }
 
@@ -42,11 +44,16 @@ class HttpTelegramRelayGateway implements TelegramGateway {
           .timeout(const Duration(seconds: 4));
       final Map<String, dynamic>? body = _jsonMap(response.body);
       final bool configured = body?['configured'] == true;
+      final bool tokenConfigured = body?['tokenConfigured'] == true;
       return IntegrationStatus(
         state: response.statusCode == 200 && configured
             ? IntegrationConnectionState.connected
             : IntegrationConnectionState.notConfigured,
-        message: configured ? 'CONNECTED' : 'RELAY NOT CONFIGURED',
+        message: configured
+            ? 'CONNECTED'
+            : tokenConfigured
+            ? 'SEND /start TO BOT'
+            : 'RELAY NOT CONFIGURED',
         checkedAt: DateTime.now(),
       );
     } on Object {
@@ -56,6 +63,29 @@ class HttpTelegramRelayGateway implements TelegramGateway {
         checkedAt: DateTime.now(),
       );
     }
+  }
+
+  @override
+  Future<String> discoverChat(TelegramRelayConfig config) async {
+    final Uri? uri = _endpoint(config, '/v1/telegram/discover-chat');
+    if (uri == null) throw const FormatException('Invalid Telegram relay URL');
+    final http.Response response = await _client
+        .post(
+          uri,
+          headers: const <String, String>{
+            'content-type': 'application/json',
+            'x-crypto-radar-client': 'flutter-ui',
+          },
+          body: '{}',
+        )
+        .timeout(const Duration(seconds: 10));
+    final Map<String, dynamic>? body = _jsonMap(response.body);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(
+        body?['error']?.toString() ?? 'Relay HTTP ${response.statusCode}',
+      );
+    }
+    return body?['message']?.toString() ?? 'CHAT CONNECTED';
   }
 
   @override

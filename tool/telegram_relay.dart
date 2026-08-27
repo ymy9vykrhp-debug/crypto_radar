@@ -26,14 +26,14 @@ Future<void> main() async {
 }
 
 class _TelegramRelay {
-  _TelegramRelay({required this.token, required this.chatId});
+  _TelegramRelay({required this.token, required this._chatId});
 
   final String token;
-  final String chatId;
+  String _chatId;
   final Set<String> _delivered = <String>{};
   final HttpClient _client = HttpClient();
 
-  bool get configured => token.isNotEmpty && chatId.isNotEmpty;
+  bool get configured => token.isNotEmpty && _chatId.isNotEmpty;
 
   Future<void> handle(HttpRequest request) async {
     final String? origin = request.headers.value('origin');
@@ -54,8 +54,37 @@ class _TelegramRelay {
       await _json(request.response, HttpStatus.ok, <String, Object?>{
         'ok': true,
         'configured': configured,
+        'tokenConfigured': token.isNotEmpty,
+        'chatConfigured': _chatId.isNotEmpty,
         'service': 'crypto-radar-telegram-relay',
       });
+      return;
+    }
+    if (request.method == 'POST' &&
+        request.uri.path == '/v1/telegram/discover-chat') {
+      if (token.isEmpty) {
+        await _json(
+          request.response,
+          HttpStatus.serviceUnavailable,
+          <String, Object?>{
+            'ok': false,
+            'error': 'Telegram token is not configured',
+          },
+        );
+        return;
+      }
+      try {
+        final String message = await _discoverChat();
+        await _json(request.response, HttpStatus.ok, <String, Object?>{
+          'ok': true,
+          'message': message,
+        });
+      } on Object catch (error) {
+        await _json(request.response, HttpStatus.badGateway, <String, Object?>{
+          'ok': false,
+          'error': _safeError(error),
+        });
+      }
       return;
     }
     if (request.method != 'POST' ||
@@ -72,7 +101,9 @@ class _TelegramRelay {
         HttpStatus.serviceUnavailable,
         <String, Object?>{
           'ok': false,
-          'error': 'Telegram token or chat ID is not configured',
+          'error': token.isEmpty
+              ? 'Telegram token is not configured'
+              : 'Send /start to the bot and discover the chat first',
         },
       );
       return;
@@ -119,7 +150,7 @@ class _TelegramRelay {
     telegramRequest.headers.contentType = ContentType.json;
     telegramRequest.write(
       jsonEncode(<String, Object?>{
-        'chat_id': chatId,
+        'chat_id': _chatId,
         'text': text,
         'disable_web_page_preview': true,
       }),
@@ -135,6 +166,54 @@ class _TelegramRelay {
           : 'Telegram HTTP ${response.statusCode}';
       throw Exception(description);
     }
+  }
+
+  Future<String> _discoverChat() async {
+    final Uri uri = Uri.https('api.telegram.org', '/bot$token/getUpdates');
+    final HttpClientRequest telegramRequest = await _client.postUrl(uri);
+    telegramRequest.headers.contentType = ContentType.json;
+    telegramRequest.write(
+      jsonEncode(<String, Object?>{
+        'limit': 100,
+        'timeout': 0,
+        'allowed_updates': <String>['message'],
+      }),
+    );
+    final HttpClientResponse response = await telegramRequest.close().timeout(
+      const Duration(seconds: 12),
+    );
+    final String body = await utf8.decoder.bind(response).join();
+    final Object? decoded = _tryDecode(body);
+    if (response.statusCode < 200 ||
+        response.statusCode >= 300 ||
+        decoded is! Map<String, dynamic> ||
+        decoded['ok'] != true) {
+      final String description = decoded is Map<String, dynamic>
+          ? decoded['description']?.toString() ?? 'Telegram getUpdates error'
+          : 'Telegram HTTP ${response.statusCode}';
+      throw Exception(description);
+    }
+    final Object? rawUpdates = decoded['result'];
+    if (rawUpdates is! List<dynamic>) {
+      throw Exception('Telegram returned no updates');
+    }
+    for (final Object? rawUpdate in rawUpdates.reversed) {
+      if (rawUpdate is! Map<String, dynamic>) continue;
+      final Object? rawMessage = rawUpdate['message'];
+      if (rawMessage is! Map<String, dynamic>) continue;
+      final String text = rawMessage['text']?.toString().trim() ?? '';
+      if (!text.startsWith('/start')) continue;
+      final Object? rawChat = rawMessage['chat'];
+      if (rawChat is! Map<String, dynamic>) continue;
+      final String discovered = rawChat['id']?.toString().trim() ?? '';
+      if (discovered.isEmpty) continue;
+      _chatId = discovered;
+      final String suffix = discovered.length <= 4
+          ? discovered
+          : discovered.substring(discovered.length - 4);
+      return 'CHAT CONNECTED · •••$suffix';
+    }
+    throw Exception('Send /start to the bot, then try again');
   }
 
   String _formatMessage(Map<String, dynamic> payload) {

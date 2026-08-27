@@ -154,6 +154,21 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
                           onPressed:
                               config.enabled && !widget.telegramController.busy
                               ? () => unawaited(
+                                  widget.telegramController.discoverChat(),
+                                )
+                              : null,
+                          icon: const Icon(Icons.person_search_outlined),
+                          label: Text(
+                            strings.pick(
+                              'Найти чат после /start',
+                              'Find chat after /start',
+                            ),
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed:
+                              config.enabled && !widget.telegramController.busy
+                              ? () => unawaited(
                                   widget.telegramController.sendTest(),
                                 )
                               : null,
@@ -175,8 +190,8 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
                     const SizedBox(height: 10),
                     Text(
                       strings.pick(
-                        'Bot Token и Chat ID задаются только переменными окружения локального relay. Они не сохраняются в Crypto Radar.',
-                        'Bot Token and Chat ID are supplied only to the local relay through environment variables. Crypto Radar never stores them.',
+                        'Запусти relay с Bot Token, открой своего бота в Telegram и отправь /start. Затем нажми «Найти чат». Токен и найденный Chat ID не сохраняются в Crypto Radar.',
+                        'Start the relay with the Bot Token, open your bot in Telegram and send /start. Then press Find chat. The token and discovered Chat ID are not stored by Crypto Radar.',
                       ),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),

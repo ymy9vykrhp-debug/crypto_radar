@@ -104,12 +104,12 @@ class HelpEngine {
       summaryEn: 'Safe notifications without exposing a token in the browser.',
       bodyRu: <String>[
         'Flutter подключается только к локальному relay по адресу 127.0.0.1.',
-        'Bot Token и Chat ID передаются relay через переменные окружения и не сохраняются в приложении.',
+        'Bot Token вводится в скрытом окне PowerShell, а Chat ID определяется после команды /start. Они не сохраняются в приложении.',
         'Telegram получает уведомления и не имеет доступа к Execution Broker.',
       ],
       bodyEn: <String>[
         'Flutter connects only to a local relay on 127.0.0.1.',
-        'Bot Token and Chat ID are supplied to the relay through environment variables.',
+        'Bot Token is entered in a hidden PowerShell prompt; Chat ID is discovered after /start. Neither is stored by the app.',
         'Telegram can send notifications but cannot access an execution broker.',
       ],
     ),

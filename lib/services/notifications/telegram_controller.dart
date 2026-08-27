@@ -61,6 +61,29 @@ class TelegramController extends ChangeNotifier {
     }
   }
 
+  Future<void> discoverChat() async {
+    if (_busy) return;
+    _busy = true;
+    _lastDelivery = null;
+    notifyListeners();
+    try {
+      _lastDelivery = await gateway.discoverChat(
+        preferences.telegramRelayConfig,
+      );
+      await _refreshStatusWithoutBusyGuard();
+    } on Object catch (error) {
+      _lastDelivery = 'CHAT NOT FOUND: ${_clean(error)}';
+      _status = IntegrationStatus(
+        state: IntegrationConnectionState.notConfigured,
+        message: 'SEND /start TO BOT',
+        checkedAt: DateTime.now(),
+      );
+    } finally {
+      _busy = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> deliver(TradeAlert alert) async {
     if (!preferences.telegramRelayConfig.enabled) return;
     try {
@@ -86,4 +109,8 @@ class TelegramController extends ChangeNotifier {
       .toString()
       .replaceFirst('Exception: ', '')
       .replaceFirst('FormatException: ', '');
+
+  Future<void> _refreshStatusWithoutBusyGuard() async {
+    _status = await gateway.check(preferences.telegramRelayConfig);
+  }
 }

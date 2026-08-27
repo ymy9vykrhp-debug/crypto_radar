@@ -43,6 +43,18 @@ void main() {
               200,
             );
           }
+          if (request.url.path == '/v1/telegram/discover-chat') {
+            return http.Response(
+              jsonEncode(<String, Object?>{
+                'ok': true,
+                'message': 'CHAT CONNECTED · •••1234',
+              }),
+              200,
+              headers: const <String, String>{
+                'content-type': 'application/json; charset=utf-8',
+              },
+            );
+          }
           return http.Response('{}', 404);
         });
         final HttpTelegramRelayGateway gateway = HttpTelegramRelayGateway(
@@ -54,10 +66,12 @@ void main() {
         );
 
         final IntegrationStatus status = await gateway.check(config);
+        final String discovery = await gateway.discoverChat(config);
         await gateway.sendTest(config);
 
         expect(status.state, IntegrationConnectionState.connected);
-        expect(requests, hasLength(2));
+        expect(discovery, contains('CONNECTED'));
+        expect(requests, hasLength(3));
         expect(requests.last.body, isNot(contains('bot_token')));
         expect(requests.last.url.host, '127.0.0.1');
         client.close();
