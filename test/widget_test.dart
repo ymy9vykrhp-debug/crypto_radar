@@ -11,6 +11,8 @@ void main() {
 
     expect(find.text('Главная'), findsOneWidget);
     expect(find.text('FARTCOIN / USDT'), findsOneWidget);
+    expect(find.text('⚡ LIVE'), findsOneWidget);
+    expect(find.text('15s'), findsWidgets);
 
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
@@ -39,5 +41,6 @@ void main() {
     expect(find.byIcon(Icons.menu), findsOneWidget);
     expect(find.text('Главная'), findsOneWidget);
     expect(find.text('FARTCOIN / USDT'), findsOneWidget);
+    expect(find.text('⚡ LIVE'), findsOneWidget);
   });
 }

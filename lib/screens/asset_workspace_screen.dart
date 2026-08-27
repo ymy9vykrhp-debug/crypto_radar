@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../engines/decision_engine.dart';
@@ -6,6 +7,7 @@ import '../engines/signal_engine.dart';
 import '../localization/app_strings.dart';
 import '../models/decision_models.dart';
 import '../models/execution_models.dart';
+import '../models/live_market_models.dart';
 import '../models/market_models.dart';
 import '../models/navigation_models.dart';
 import '../models/signal_models.dart';
@@ -28,6 +30,7 @@ class AssetWorkspaceScreen extends StatelessWidget {
     required this.bybitService,
     required this.selected,
     required this.onSelected,
+    this.livePrice,
   });
 
   final MarketSnapshot snapshot;
@@ -35,6 +38,7 @@ class AssetWorkspaceScreen extends StatelessWidget {
   final BybitService bybitService;
   final WorkspaceSection selected;
   final ValueChanged<WorkspaceSection> onSelected;
+  final ValueListenable<LivePriceTick?>? livePrice;
 
   @override
   Widget build(BuildContext context) {
@@ -64,9 +68,10 @@ class AssetWorkspaceScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    Text(
-                      '\$${_price(snapshot.ticker.price)}',
-                      style: Theme.of(context).textTheme.titleMedium,
+                    _WorkspaceLivePrice(
+                      symbol: snapshot.symbol,
+                      fallback: snapshot.ticker.price,
+                      livePrice: livePrice,
                     ),
                   ],
                 ),
@@ -108,6 +113,7 @@ class AssetWorkspaceScreen extends StatelessWidget {
         return ProductDashboardScreen(
           snapshot: snapshot,
           journalController: journalController,
+          livePrice: livePrice,
           onWhy: () => onSelected(WorkspaceSection.why),
           onOpenWorkspace: () => onSelected(WorkspaceSection.chart),
         );
@@ -613,6 +619,39 @@ class _LevelRow {
   final String zone;
   final String timeframe;
   final Bias bias;
+}
+
+class _WorkspaceLivePrice extends StatelessWidget {
+  const _WorkspaceLivePrice({
+    required this.symbol,
+    required this.fallback,
+    required this.livePrice,
+  });
+
+  final String symbol;
+  final double fallback;
+  final ValueListenable<LivePriceTick?>? livePrice;
+
+  @override
+  Widget build(BuildContext context) {
+    final ValueListenable<LivePriceTick?>? listenable = livePrice;
+    if (listenable == null) {
+      return Text(
+        '\$${_price(fallback)}',
+        style: Theme.of(context).textTheme.titleMedium,
+      );
+    }
+    return ValueListenableBuilder<LivePriceTick?>(
+      valueListenable: listenable,
+      builder: (BuildContext context, LivePriceTick? tick, Widget? child) {
+        final double price = tick?.symbol == symbol ? tick!.price : fallback;
+        return Text(
+          '\$${_price(price)}',
+          style: Theme.of(context).textTheme.titleMedium,
+        );
+      },
+    );
+  }
 }
 
 String _price(double value) {

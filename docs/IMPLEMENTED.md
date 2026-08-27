@@ -1,6 +1,6 @@
 # Crypto Radar — Implementation Status
 
-Last updated: 2026-08-26
+Last updated: 2026-08-27
 
 ## DONE — Phase 1 stable core
 
@@ -82,6 +82,19 @@ Last updated: 2026-08-26
 - Verification: `flutter analyze` clean; all 31 tests passed; Chrome debug launch succeeded; live public Bybit response contained 732 trading USDT Perpetual instruments at verification time.
 - Git recovery point: `958f65c` (`add dynamic crypto universe and asset explorer`).
 
+## DONE — LIVE price + confirmed-entry alerts
+
+- Added mutually exclusive `⚡ LIVE` and `15s` modes. The economy timer is cancelled while LIVE is active; manual refresh remains available in both modes.
+- LIVE uses the public Bybit linear WebSocket ticker with no authentication, publishes the newest in-memory price to UI widgets at most once per 350 ms, sends a 20-second heartbeat and reconnects with bounded backoff.
+- Price widgets listen independently, so high-frequency ticks do not rebuild the complete Dashboard or rerun `SignalEngine`.
+- A confirmed 1m WebSocket candle schedules one full REST/candle analysis refresh per minute in LIVE mode. The existing 15-second analysis remains exclusive to economy mode.
+- Connection state is visible as `LIVE`, `CONNECTING` or `OFFLINE`; switching symbols closes the previous channel and subscribes to the selected asset.
+- Added a strong-signal alert gate for a new `ENTRY_CONFIRMED`, with per-symbol cooldown, direction/quality exceptions and exact-signal deduplication.
+- The modal shows Entry, Stop, TP1/TP2, R:R, leverage and real explanation reasons. Confidence is explicitly labelled factor confluence, never profit probability; USDT risk is not fabricated without a position size.
+- Added an optional system alert sound in Settings. The WebSocket and all timers/subscriptions are closed during mode changes and application disposal.
+- Safety remains `MONITOR / ANALYSIS ONLY`; no private Bybit endpoint, API key, order or execution path was introduced.
+- Verification: `flutter analyze` clean; all 35 tests passed; Chrome debug launch succeeded; a live public Bybit WebSocket smoke-test received `tickers.BTCUSDT` with `lastPrice`.
+
 ## TODO
 
 - Phase 3: deeper Market Structure Engine 2.0 and correction/BOS/CHOCH event history.
@@ -90,7 +103,7 @@ Last updated: 2026-08-26
 - Phase 6: full Market Regime, Strategy Selector and explicit NO TRADE.
 - Full rolling walk-forward/OOS research, fees and slippage remain required before Paper Trading.
 - A Pine Script mirror may be added after the strategy is stable, but it would recalculate the strategy inside TradingView rather than read local Flutter signals. A licensed Advanced Charts integration is a later deployment option.
-- Alert delivery and alert deduplication remain deferred to the alerts phase.
+- External alert delivery remains deferred. Local strong `ENTRY_CONFIRMED` popup delivery and deduplication are implemented.
 - Advanced chart roadmap: Volume Profile, Footprint/Clusters, Heatmap, Order Flow, Replay, Journal trade overlays and Backtest replay.
 - Remaining UI depth: configurable Assets/Favorites/Opportunity Queue, real Alerts/News feeds, persisted UI preferences, Mistakes/Review editing and complete localization of legacy engine-generated explanation text.
 - Deferred final product layer: About Crypto Radar, centralized `ProductLinksConfig`, separately modelled Official Telegram and External Signal Sources, About & Support, sidebar links and local Help Center. UI/config only; no payments, accounts, licences or commercial backend.

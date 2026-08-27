@@ -83,13 +83,49 @@ class SettingsScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 10),
-        _PlannedSettingsGroup(
+        ProductExpandableSection(
           title: strings.pick('Уведомления', 'Alerts'),
           icon: Icons.notifications_outlined,
-          items: <String>[
-            strings.pick('Оповещения', 'Alerts'),
-            strings.pick('Звук', 'Sound'),
-          ],
+          initiallyExpanded: true,
+          child: Column(
+            children: <Widget>[
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.security_rounded),
+                title: Text(
+                  strings.pick('Торговые уведомления', 'Trade alerts'),
+                ),
+                subtitle: Text(
+                  strings.pick(
+                    'Только сильный новый ENTRY_CONFIRMED · MONITOR ONLY',
+                    'Strong new ENTRY_CONFIRMED only · MONITOR ONLY',
+                  ),
+                ),
+                trailing: ProductStatusChip(
+                  label: strings.active,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                secondary: Icon(
+                  preferences.soundEnabled
+                      ? Icons.volume_up_rounded
+                      : Icons.volume_off_rounded,
+                ),
+                title: Text(strings.pick('Звук сигнала', 'Alert sound')),
+                subtitle: Text(
+                  strings.pick(
+                    'Системный звук при сильном подтверждённом входе',
+                    'System sound for a strong confirmed entry',
+                  ),
+                ),
+                value: preferences.soundEnabled,
+                onChanged: preferences.setSoundEnabled,
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 10),
         _PlannedSettingsGroup(

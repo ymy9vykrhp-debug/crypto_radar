@@ -9,13 +9,16 @@ void main() {
 
     expect(controller.themeMode, ThemeMode.dark);
     expect(controller.language, AppLanguage.ru);
+    expect(controller.soundEnabled, isTrue);
     expect(const AppStrings(AppLanguage.ru).instrument, 'Инструмент');
 
     controller.setThemeMode(ThemeMode.light);
     controller.setLanguage(AppLanguage.en);
+    controller.setSoundEnabled(false);
 
     expect(controller.themeMode, ThemeMode.light);
     expect(controller.language, AppLanguage.en);
+    expect(controller.soundEnabled, isFalse);
     expect(const AppStrings(AppLanguage.en).instrument, 'Instrument');
   });
 }

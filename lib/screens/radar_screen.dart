@@ -6,14 +6,22 @@ import 'package:http/http.dart' as http;
 import '../engines/backtest_engine.dart';
 import '../localization/app_strings.dart';
 import '../models/market_models.dart';
+import '../models/live_market_models.dart';
 import '../models/navigation_models.dart';
+import '../models/signal_models.dart';
+import '../models/trade_alert_models.dart';
 import '../services/app_preferences_controller.dart';
 import '../services/bybit_service.dart';
 import '../services/crypto_universe_controller.dart';
 import '../services/journal_controller.dart';
 import '../services/journal_store.dart';
+import '../services/live_price_service.dart';
+import '../services/notification_sound_service.dart';
+import '../services/trade_alert_controller.dart';
+import '../theme/app_theme.dart';
 import '../widgets/app_navigation.dart';
 import '../widgets/product_components.dart';
+import '../widgets/trade_signal_alert_dialog.dart';
 import 'asset_workspace_screen.dart';
 import 'asset_explorer_screen.dart';
 import 'integrations_screen.dart';
@@ -44,12 +52,22 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
   late final BybitService _repository;
   late final CryptoUniverseController _universeController;
   late final JournalController _journalController;
+  late final Future<void> _journalReady;
+  late final LivePriceService _livePriceService;
+  late final TradeAlertController _tradeAlertController;
+  final NotificationSoundPlayer _soundPlayer =
+      const SystemNotificationSoundPlayer();
   Timer? _refreshTimer;
   AppSection _section = AppSection.home;
   MarketSectionView _marketView = MarketSectionView.explorer;
   WorkspaceSection _workspaceSection = WorkspaceSection.overview;
   String _selectedSymbol = 'FARTCOINUSDT';
-  bool _autoRefresh = true;
+  MarketUpdateMode _updateMode = MarketUpdateMode.economy15s;
+  final ValueNotifier<LivePriceTick?> _livePrice =
+      ValueNotifier<LivePriceTick?>(null);
+  int _seenAnalysisRevision = 0;
+  LiveConnectionStatus _renderedLiveStatus = LiveConnectionStatus.offline;
+  bool _showingTradeAlert = false;
   bool _loading = false;
   String? _error;
   MarketSnapshot? _snapshot;
@@ -64,19 +82,24 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
       store: JournalStore(),
       backtestEngine: BacktestEngine(bybitService: _repository),
     );
-    _journalController.initialize();
+    _journalReady = _journalController.initialize();
+    _tradeAlertController = TradeAlertController();
+    _livePriceService = LivePriceService()..addListener(_onLivePriceChanged);
     _universeController.initialize();
     if (widget.autoStart) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
       _restartTimer();
-    } else {
-      _autoRefresh = false;
     }
   }
 
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _livePriceService
+      ..removeListener(_onLivePriceChanged)
+      ..dispose();
+    _tradeAlertController.dispose();
+    _livePrice.dispose();
     _universeController.dispose();
     _journalController.dispose();
     _client.close();
@@ -85,7 +108,9 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
 
   void _restartTimer() {
     _refreshTimer?.cancel();
-    if (!_autoRefresh || !widget.autoStart) return;
+    if (_updateMode != MarketUpdateMode.economy15s || !widget.autoStart) {
+      return;
+    }
     _refreshTimer = Timer.periodic(
       const Duration(seconds: 15),
       (_) => _refresh(),
@@ -101,15 +126,91 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
     try {
       final MarketSnapshot result = await _repository.load(_selectedSymbol);
       if (!mounted || result.symbol != _selectedSymbol) return;
+      await _journalReady;
+      _tradeAlertController.prime(_journalController.signals);
       await _journalController.processLiveSnapshot(result);
       if (!mounted) return;
       setState(() => _snapshot = result);
+      final TradeAlert? alert = _tradeAlertController.evaluate(
+        _journalController.signals.where(
+          (RadarSignal signal) => signal.symbol == result.symbol,
+        ),
+      );
+      if (alert != null) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _presentTradeAlert(alert, result),
+        );
+      }
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _error = _friendlyError(error));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _onLivePriceChanged() {
+    if (!mounted || _updateMode != MarketUpdateMode.live) return;
+    final int revision = _livePriceService.analysisRevision;
+    if (revision > _seenAnalysisRevision) {
+      _seenAnalysisRevision = revision;
+      if (widget.autoStart) unawaited(_refresh());
+    }
+    final LivePriceTick? tick = _livePriceService.latestTick;
+    if (tick == null || tick.symbol != _selectedSymbol) {
+      if (_livePrice.value != null) _livePrice.value = null;
+    } else if (_livePrice.value?.price != tick.price ||
+        _livePrice.value?.receivedAt != tick.receivedAt) {
+      _livePrice.value = tick;
+    }
+    if (_renderedLiveStatus != _livePriceService.status) {
+      _renderedLiveStatus = _livePriceService.status;
+      setState(() {});
+    }
+  }
+
+  Future<void> _setUpdateMode(MarketUpdateMode mode) async {
+    if (_updateMode == mode) return;
+    setState(() => _updateMode = mode);
+    _refreshTimer?.cancel();
+    if (mode == MarketUpdateMode.live) {
+      _seenAnalysisRevision = _livePriceService.analysisRevision;
+      if (widget.autoStart) {
+        await _livePriceService.start(_selectedSymbol);
+        if (_snapshot == null) unawaited(_refresh());
+      }
+    } else {
+      _livePrice.value = null;
+      await _livePriceService.stop();
+      _restartTimer();
+    }
+  }
+
+  Future<void> _presentTradeAlert(
+    TradeAlert alert,
+    MarketSnapshot snapshot,
+  ) async {
+    if (!mounted ||
+        _showingTradeAlert ||
+        alert.signal.symbol != snapshot.symbol) {
+      return;
+    }
+    _showingTradeAlert = true;
+    if (widget.preferences.soundEnabled) {
+      await _soundPlayer.playStrongAlert();
+    }
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) => TradeSignalAlertDialog(
+        alert: alert,
+        snapshot: snapshot,
+        onOpenMarket: () => _openWorkspace(WorkspaceSection.overview),
+        onWhy: () => _openWorkspace(WorkspaceSection.why),
+      ),
+    );
+    _showingTradeAlert = false;
   }
 
   String _friendlyError(Object error) {
@@ -135,6 +236,9 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
       _error = null;
       _workspaceSection = WorkspaceSection.overview;
     });
+    if (_updateMode == MarketUpdateMode.live && widget.autoStart) {
+      unawaited(_livePriceService.switchSymbol(symbol));
+    }
     while (_loading && mounted) {
       await Future<void>.delayed(const Duration(milliseconds: 100));
     }
@@ -184,6 +288,10 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
           appBar: AppBar(
             title: Text(context.strings.appSection(_section)),
             actions: <Widget>[
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: _connectionStatusChip(),
+              ),
               if (_loading)
                 const Padding(
                   padding: EdgeInsets.only(right: 16),
@@ -233,6 +341,8 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
                     ?.copyWith(fontWeight: FontWeight.w800),
               ),
               const Spacer(),
+              _connectionStatusChip(),
+              const SizedBox(width: 10),
               if (_loading)
                 const SizedBox.square(
                   dimension: 20,
@@ -249,55 +359,99 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
     final AppStrings strings = context.strings;
     return Material(
       color: Theme.of(context).colorScheme.surface,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 9, 12, 9),
-        child: Row(
-          children: <Widget>[
-            Expanded(
-              child: OutlinedButton.icon(
-                // The button keeps the familiar pair label while opening the
-                // dynamic Asset Explorer instead of a hardcoded dropdown.
-                onPressed: () {
-                  setState(() {
-                    _section = AppSection.market;
-                    _marketView = MarketSectionView.explorer;
-                  });
-                },
-                icon: const Icon(Icons.currency_bitcoin_rounded),
-                label: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    _displaySymbol(_selectedSymbol),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final Widget assetButton = OutlinedButton.icon(
+            // The button keeps the familiar pair label while opening the
+            // dynamic Asset Explorer instead of a hardcoded dropdown.
+            onPressed: () {
+              setState(() {
+                _section = AppSection.market;
+                _marketView = MarketSectionView.explorer;
+              });
+            },
+            icon: const Icon(Icons.currency_bitcoin_rounded),
+            label: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                _displaySymbol(_selectedSymbol),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const SizedBox(width: 8),
-            Tooltip(
-              message: strings.autoRefresh,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  const Text('15s'),
-                  Switch(
-                    value: _autoRefresh,
-                    onChanged: (bool value) {
-                      setState(() => _autoRefresh = value);
-                      _restartTimer();
-                    },
+          );
+          final Widget modeControl = SegmentedButton<MarketUpdateMode>(
+            showSelectedIcon: false,
+            segments: MarketUpdateMode.values
+                .map<ButtonSegment<MarketUpdateMode>>(
+                  (MarketUpdateMode mode) => ButtonSegment<MarketUpdateMode>(
+                    value: mode,
+                    label: Text(mode.label),
                   ),
-                ],
-              ),
-            ),
-            IconButton.filledTonal(
-              tooltip: strings.refreshNow,
-              onPressed: _loading ? null : _refresh,
-              icon: const Icon(Icons.refresh_rounded),
-            ),
-          ],
-        ),
+                )
+                .toList(growable: false),
+            selected: <MarketUpdateMode>{_updateMode},
+            onSelectionChanged: widget.autoStart
+                ? (Set<MarketUpdateMode> selection) =>
+                      unawaited(_setUpdateMode(selection.first))
+                : null,
+          );
+          final Widget refresh = IconButton.filledTonal(
+            tooltip: strings.refreshNow,
+            onPressed: _loading ? null : _refresh,
+            icon: const Icon(Icons.refresh_rounded),
+          );
+          final Widget controls = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[modeControl, const SizedBox(width: 8), refresh],
+          );
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 9, 12, 9),
+            child: constraints.maxWidth < 650
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      assetButton,
+                      const SizedBox(height: 8),
+                      Align(alignment: Alignment.centerRight, child: controls),
+                    ],
+                  )
+                : Row(
+                    children: <Widget>[
+                      Expanded(child: assetButton),
+                      const SizedBox(width: 8),
+                      controls,
+                    ],
+                  ),
+          );
+        },
       ),
+    );
+  }
+
+  Widget _connectionStatusChip() {
+    final RadarSemanticColors semantic = Theme.of(context)
+        .extension<RadarSemanticColors>()!;
+    if (_updateMode == MarketUpdateMode.economy15s) {
+      return ProductStatusChip(
+        label: '15s',
+        color: semantic.neutral,
+        icon: Icons.timer_outlined,
+      );
+    }
+    final LiveConnectionStatus status = _livePriceService.status;
+    final Color color = switch (status) {
+      LiveConnectionStatus.live => semantic.bullish,
+      LiveConnectionStatus.connecting => semantic.warning,
+      LiveConnectionStatus.offline => semantic.bearish,
+    };
+    return ProductStatusChip(
+      label: status.label,
+      color: color,
+      icon: status == LiveConnectionStatus.live
+          ? Icons.bolt_rounded
+          : status == LiveConnectionStatus.connecting
+          ? Icons.sync_rounded
+          : Icons.cloud_off_rounded,
     );
   }
 
@@ -315,6 +469,7 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
         return ProductDashboardScreen(
           snapshot: _snapshot!,
           journalController: _journalController,
+          livePrice: _livePrice,
           onWhy: () => _openWorkspace(WorkspaceSection.why),
           onOpenWorkspace: () => _openWorkspace(WorkspaceSection.overview),
         );
@@ -394,6 +549,7 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
                       snapshot: _snapshot!,
                       journalController: _journalController,
                       bybitService: _repository,
+                      livePrice: _livePrice,
                       selected: _workspaceSection,
                       onSelected: (WorkspaceSection value) =>
                           setState(() => _workspaceSection = value),

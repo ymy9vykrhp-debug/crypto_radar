@@ -49,6 +49,8 @@ Supported now: a dynamic public Bybit USDT Perpetual universe with one selected 
 15. **Execution discussion only:** Bybit orders may be considered after all safety gates and explicit user approval.
 16. **Product / Support / Official Links (deferred, after the active delivery queue):** prepare non-commercial product identity, official-link configuration and local Help Center UI without payments, accounts or trading access.
 
+Local monitor-only `ENTRY_CONFIRMED` popups and public WebSocket price updates are already delivered. Phase 14 refers only to external TradingView/Telegram delivery and remains gated by strategy stability.
+
 ### Deferred Phase 16 scope — Product / Support / Official Links
 
 - Add an **About Crypto Radar** view with Version, Build, Strategy Version and Data Engine Version.

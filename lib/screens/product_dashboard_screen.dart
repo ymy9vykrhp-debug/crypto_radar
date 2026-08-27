@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../engines/decision_engine.dart';
@@ -7,6 +8,7 @@ import '../localization/app_strings.dart';
 import '../models/backtest_models.dart';
 import '../models/decision_models.dart';
 import '../models/execution_models.dart';
+import '../models/live_market_models.dart';
 import '../models/market_models.dart';
 import '../models/navigation_models.dart';
 import '../models/signal_models.dart';
@@ -21,12 +23,14 @@ class ProductDashboardScreen extends StatelessWidget {
     required this.journalController,
     required this.onWhy,
     required this.onOpenWorkspace,
+    this.livePrice,
   });
 
   final MarketSnapshot snapshot;
   final JournalController journalController;
   final VoidCallback onWhy;
   final VoidCallback onOpenWorkspace;
+  final ValueListenable<LivePriceTick?>? livePrice;
 
   @override
   Widget build(BuildContext context) {
@@ -65,6 +69,7 @@ class ProductDashboardScreen extends StatelessWidget {
               color: decisionColor,
               onWhy: onWhy,
               onOpenWorkspace: onOpenWorkspace,
+              livePrice: livePrice,
             ),
             const SizedBox(height: 14),
             LayoutBuilder(
@@ -268,6 +273,7 @@ class _DecisionHero extends StatelessWidget {
     required this.color,
     required this.onWhy,
     required this.onOpenWorkspace,
+    required this.livePrice,
   });
 
   final MarketSnapshot snapshot;
@@ -275,6 +281,7 @@ class _DecisionHero extends StatelessWidget {
   final Color color;
   final VoidCallback onWhy;
   final VoidCallback onOpenWorkspace;
+  final ValueListenable<LivePriceTick?>? livePrice;
 
   @override
   Widget build(BuildContext context) {
@@ -302,8 +309,10 @@ class _DecisionHero extends StatelessWidget {
                   style: Theme.of(context).textTheme.labelLarge,
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  '\$${_price(snapshot.ticker.price)}',
+                _LivePriceText(
+                  symbol: snapshot.symbol,
+                  fallback: snapshot.ticker.price,
+                  livePrice: livePrice,
                   style: Theme.of(context).textTheme.headlineMedium
                       ?.copyWith(fontWeight: FontWeight.w900),
                 ),
@@ -509,6 +518,35 @@ class _CompactSummary extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _LivePriceText extends StatelessWidget {
+  const _LivePriceText({
+    required this.symbol,
+    required this.fallback,
+    required this.livePrice,
+    required this.style,
+  });
+
+  final String symbol;
+  final double fallback;
+  final ValueListenable<LivePriceTick?>? livePrice;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final ValueListenable<LivePriceTick?>? listenable = livePrice;
+    if (listenable == null) {
+      return Text('\$${_price(fallback)}', style: style);
+    }
+    return ValueListenableBuilder<LivePriceTick?>(
+      valueListenable: listenable,
+      builder: (BuildContext context, LivePriceTick? tick, Widget? child) {
+        final double price = tick?.symbol == symbol ? tick!.price : fallback;
+        return Text('\$${_price(price)}', style: style);
+      },
     );
   }
 }
