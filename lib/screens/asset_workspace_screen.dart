@@ -30,6 +30,7 @@ class AssetWorkspaceScreen extends StatelessWidget {
     required this.bybitService,
     required this.selected,
     required this.onSelected,
+    required this.onCalculateTrade,
     this.livePrice,
   });
 
@@ -38,6 +39,7 @@ class AssetWorkspaceScreen extends StatelessWidget {
   final BybitService bybitService;
   final WorkspaceSection selected;
   final ValueChanged<WorkspaceSection> onSelected;
+  final VoidCallback onCalculateTrade;
   final ValueListenable<LivePriceTick?>? livePrice;
 
   @override
@@ -116,6 +118,7 @@ class AssetWorkspaceScreen extends StatelessWidget {
           livePrice: livePrice,
           onWhy: () => onSelected(WorkspaceSection.why),
           onOpenWorkspace: () => onSelected(WorkspaceSection.chart),
+          onCalculateTrade: onCalculateTrade,
         );
       case WorkspaceSection.chart:
         return ChartScreen(
@@ -131,7 +134,10 @@ class AssetWorkspaceScreen extends StatelessWidget {
       case WorkspaceSection.volume:
         return _VolumeWorkspace(snapshot: snapshot);
       case WorkspaceSection.signal:
-        return _SignalWorkspace(snapshot: snapshot);
+        return _SignalWorkspace(
+          snapshot: snapshot,
+          onCalculateTrade: onCalculateTrade,
+        );
       case WorkspaceSection.why:
         return WhyNowScreen(marketSnapshot: snapshot);
       case WorkspaceSection.journal:
@@ -456,9 +462,13 @@ class _VolumeWorkspace extends StatelessWidget {
 }
 
 class _SignalWorkspace extends StatelessWidget {
-  const _SignalWorkspace({required this.snapshot});
+  const _SignalWorkspace({
+    required this.snapshot,
+    required this.onCalculateTrade,
+  });
 
   final MarketSnapshot snapshot;
+  final VoidCallback onCalculateTrade;
 
   @override
   Widget build(BuildContext context) {
@@ -534,6 +544,17 @@ class _SignalWorkspace extends StatelessWidget {
                   value: '${decision.qualityScores.risk}/100',
                 ),
               ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.icon(
+            onPressed: onCalculateTrade,
+            icon: const Icon(Icons.calculate_rounded),
+            label: Text(
+              strings.pick('💰 Рассчитать сделку', '💰 Calculate position'),
             ),
           ),
         ),

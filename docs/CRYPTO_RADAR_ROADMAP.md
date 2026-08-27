@@ -15,7 +15,7 @@ This document is the compact, durable project master plan. Changes are delivered
 
 ## Target pipeline
 
-`Market Data -> Indicators -> Structure -> Levels -> Regime -> Strategy -> Decision -> Risk -> Journal/Tracker -> Backtest/Statistics -> Explanation`
+`Market Data -> Indicators -> Structure -> Levels -> Regime -> Strategy -> Decision -> Structural Stop/Targets -> Smart Position/Risk -> Journal/Tracker -> Backtest/Statistics -> Explanation`
 
 Supported now: a dynamic public Bybit USDT Perpetual universe with one selected asset per workspace; 1m, 5m, 15m and 1h trading analysis; visual-only 4h chart history. Historical Backtest remains deliberately limited to BTCUSDT and FARTCOINUSDT until broader validation is implemented.
 
@@ -50,6 +50,8 @@ Supported now: a dynamic public Bybit USDT Perpetual universe with one selected 
 16. **Product / Support / Official Links (deferred, after the active delivery queue):** prepare non-commercial product identity, official-link configuration and local Help Center UI without payments, accounts or trading access.
 
 Local monitor-only `ENTRY_CONFIRMED` popups and public WebSocket price updates are already delivered. Phase 14 refers only to external TradingView/Telegram delivery and remains gated by strategy stability.
+
+The local Smart Position Calculator is delivered after Decision and structural Stop/targets. It calculates margin, risk-limited notional, fee/slippage estimates, leverage safety, quantity and net outcomes without order execution. Bybit Demo remains Phase 11/future execution work.
 
 ### Deferred Phase 16 scope — Product / Support / Official Links
 

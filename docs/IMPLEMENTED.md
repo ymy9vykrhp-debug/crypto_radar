@@ -95,6 +95,19 @@ Last updated: 2026-08-27
 - Safety remains `MONITOR / ANALYSIS ONLY`; no private Bybit endpoint, API key, order or execution path was introduced.
 - Verification: `flutter analyze` clean; all 35 tests passed; Chrome debug launch succeeded; a live public Bybit WebSocket smoke-test received `tickers.BTCUSDT` with `lastPrice`.
 
+## DONE — Smart Position Calculator
+
+- Added a pure `PositionCalculator` after the existing Decision/structural-stop path. It never moves Entry, Stop or targets to manufacture a preferred leverage.
+- The user enters allocated margin and chooses 1%, 2%, 3% or a custom risk. The calculator derives maximum loss, effective stop cost, risk-limited notional and rounds the recommended leverage down.
+- A separate `LeverageSafety` caps the mathematical result using ATR, 24h volatility, structural-stop width, estimated spread, market regime, asset risk class, impulse/CHAOS state, Confidence and an approximate liquidation buffer. The hard product cap remains 10x.
+- Added editable/persisted `FeeModel` settings for maker/taker rates, entry/target/stop order types, target/stop slippage, estimated spread and safety buffer. Defaults are estimates and are never presented as account-specific Bybit fees.
+- Added gross/net stop and TP1/TP2/optional TP3 outcomes, Raw and Net R:R, costs-to-target ratio and a separate 0.3% small-move evaluation with WORTH IT / COSTS HIGH / SKIP verdicts.
+- The calculator can return TRADE ACCEPTABLE, WAIT, LOW EDGE, SKIP THIS TRADE or TRADE BLOCKED and explains the result in plain language.
+- Entry, Stop and TP fields can be overridden inside the calculator with immediate recalculation. The original Decision Engine structure remains unchanged.
+- The calculator is available from Home, the asset Signal workspace and a strong ENTRY_CONFIRMED alert. It produces an execution-ready `SmartTradePlan`, but no order, API key or private Bybit endpoint was added.
+- Future exchange constraints are represented by `qtyStep`, `minOrderQuantity`, `minNotional`, `tickSize` and exchange maximum leverage fields without pretending that account execution is connected.
+- Verification: `flutter analyze` clean; all 47 tests passed; responsive calculator widget test passed at 430 px; Chrome debug launch connected and ran without runtime errors.
+
 ## TODO
 
 - Phase 3: deeper Market Structure Engine 2.0 and correction/BOS/CHOCH event history.

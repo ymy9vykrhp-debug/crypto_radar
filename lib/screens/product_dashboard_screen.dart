@@ -23,6 +23,7 @@ class ProductDashboardScreen extends StatelessWidget {
     required this.journalController,
     required this.onWhy,
     required this.onOpenWorkspace,
+    required this.onCalculateTrade,
     this.livePrice,
   });
 
@@ -30,6 +31,7 @@ class ProductDashboardScreen extends StatelessWidget {
   final JournalController journalController;
   final VoidCallback onWhy;
   final VoidCallback onOpenWorkspace;
+  final VoidCallback onCalculateTrade;
   final ValueListenable<LivePriceTick?>? livePrice;
 
   @override
@@ -154,6 +156,7 @@ class ProductDashboardScreen extends StatelessWidget {
               decision: decision,
               color: decisionColor,
               strings: strings,
+              onCalculateTrade: onCalculateTrade,
             ),
             const SizedBox(height: 14),
             LayoutBuilder(
@@ -369,11 +372,13 @@ class _ActionAndPlan extends StatelessWidget {
     required this.decision,
     required this.color,
     required this.strings,
+    required this.onCalculateTrade,
   });
 
   final DecisionSnapshot decision;
   final Color color;
   final AppStrings strings;
+  final VoidCallback onCalculateTrade;
 
   @override
   Widget build(BuildContext context) {
@@ -433,6 +438,15 @@ class _ActionAndPlan extends StatelessWidget {
                   value: '${decision.leverage}x',
                 ),
               ],
+            ),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              key: const ValueKey<String>('smart-position-calculator-button'),
+              onPressed: onCalculateTrade,
+              icon: const Icon(Icons.calculate_rounded),
+              label: Text(
+                strings.pick('💰 Рассчитать сделку', '💰 Calculate position'),
+              ),
             ),
           ],
         ),

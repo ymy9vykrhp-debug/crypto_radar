@@ -17,12 +17,14 @@ class TradeSignalAlertDialog extends StatelessWidget {
     required this.snapshot,
     required this.onOpenMarket,
     required this.onWhy,
+    required this.onCalculateTrade,
   });
 
   final TradeAlert alert;
   final MarketSnapshot snapshot;
   final VoidCallback onOpenMarket;
   final VoidCallback onWhy;
+  final VoidCallback onCalculateTrade;
 
   @override
   Widget build(BuildContext context) {
@@ -127,6 +129,14 @@ class TradeSignalAlertDialog extends StatelessWidget {
           },
           icon: const Icon(Icons.help_outline_rounded),
           label: Text(strings.pick('Почему сейчас?', 'Why now?')),
+        ),
+        OutlinedButton.icon(
+          onPressed: () {
+            Navigator.of(context).pop();
+            onCalculateTrade();
+          },
+          icon: const Icon(Icons.calculate_rounded),
+          label: Text(strings.pick('Рассчитать сделку', 'Calculate position')),
         ),
         FilledButton.icon(
           onPressed: () {

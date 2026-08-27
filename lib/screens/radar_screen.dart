@@ -4,10 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../engines/backtest_engine.dart';
+import '../engines/decision_engine.dart';
+import '../engines/phase_a_engine.dart';
+import '../engines/signal_engine.dart';
 import '../localization/app_strings.dart';
+import '../models/crypto_universe_models.dart';
+import '../models/decision_models.dart';
 import '../models/market_models.dart';
 import '../models/live_market_models.dart';
 import '../models/navigation_models.dart';
+import '../models/position_calculator_models.dart';
 import '../models/signal_models.dart';
 import '../models/trade_alert_models.dart';
 import '../services/app_preferences_controller.dart';
@@ -21,6 +27,7 @@ import '../services/trade_alert_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_navigation.dart';
 import '../widgets/product_components.dart';
+import '../widgets/smart_position_calculator_dialog.dart';
 import '../widgets/trade_signal_alert_dialog.dart';
 import 'asset_workspace_screen.dart';
 import 'asset_explorer_screen.dart';
@@ -208,6 +215,7 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
         snapshot: snapshot,
         onOpenMarket: () => _openWorkspace(WorkspaceSection.overview),
         onWhy: () => _openWorkspace(WorkspaceSection.why),
+        onCalculateTrade: () => _openPositionCalculator(snapshot),
       ),
     );
     _showingTradeAlert = false;
@@ -263,6 +271,41 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
       _marketView = MarketSectionView.workspace;
       _workspaceSection = section;
     });
+  }
+
+  Future<void> _openPositionCalculator(MarketSnapshot snapshot) async {
+    final RadarSignal? rawSignal = SignalEngine.createSignal(snapshot);
+    final RadarSignal? executionSignal = rawSignal == null
+        ? null
+        : PhaseAEngine.preview(market: snapshot, signal: rawSignal);
+    final DecisionSnapshot decision = DecisionEngine.build(
+      snapshot,
+      executionSignal: executionSignal,
+    );
+    CryptoAsset? asset;
+    for (final CryptoAsset candidate in _universeController.assets) {
+      if (candidate.symbol == snapshot.symbol) {
+        asset = candidate;
+        break;
+      }
+    }
+    final SmartPositionInput input = SmartPositionInput.fromDecision(
+      market: snapshot,
+      decision: decision,
+      allocatedMargin: 100.0,
+      riskPercent: widget.preferences.effectiveRiskPercent,
+      volatilityPercent: asset?.volatilityPercent ?? 0.0,
+      exchangeMaxLeverage: asset?.maxLeverage ?? 10.0,
+    );
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) => SmartPositionCalculatorDialog(
+        initialInput: input,
+        preferences: widget.preferences,
+      ),
+    );
   }
 
   @override
@@ -472,6 +515,7 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
           livePrice: _livePrice,
           onWhy: () => _openWorkspace(WorkspaceSection.why),
           onOpenWorkspace: () => _openWorkspace(WorkspaceSection.overview),
+          onCalculateTrade: () => _openPositionCalculator(_snapshot!),
         );
       case AppSection.market:
         return _buildMarketContent();
@@ -551,6 +595,8 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
                       bybitService: _repository,
                       livePrice: _livePrice,
                       selected: _workspaceSection,
+                      onCalculateTrade: () =>
+                          _openPositionCalculator(_snapshot!),
                       onSelected: (WorkspaceSection value) =>
                           setState(() => _workspaceSection = value),
                     ),

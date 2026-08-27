@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'localization/app_strings.dart';
@@ -21,6 +23,7 @@ class _CryptoRadarAppState extends State<CryptoRadarApp> {
   void initState() {
     super.initState();
     _preferences = AppPreferencesController();
+    if (widget.autoStart) unawaited(_preferences.initialize());
   }
 
   @override
