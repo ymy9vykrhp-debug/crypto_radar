@@ -5,6 +5,7 @@ enum AppSection {
   journal,
   research,
   news,
+  help,
   integrations,
   settings,
 }

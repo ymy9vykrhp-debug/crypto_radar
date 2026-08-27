@@ -43,11 +43,11 @@ Supported now: a dynamic public Bybit USDT Perpetual universe with one selected 
 9. **News risk:** high-impact events as a risk filter, never a trade generator.
 10. **Research safety:** fixed train/validation/out-of-sample and guarded profile learning delivered; rolling walk-forward, fees/slippage and what-if remain.
 11. **Paper trading:** virtual balance, positions, fees-ready accounting and equity curve.
-12. **Local Radar Chat:** questions answered only from `DecisionSnapshot`; future LLM is explanation-only.
+12. **Local Radar Help (foundation delivered):** Help Center and contextual questions are answered only from a frozen `DecisionSnapshot`; future LLM remains explanation-only.
 13. **Macro/cross-market:** correlations, risk-on/off, divergence and lead/lag.
-14. **External views/alerts:** TradingView and Telegram after strategy stability.
+14. **External views/alerts:** safe outgoing Telegram `ENTRY_CONFIRMED` relay delivered; read-only commands, summaries and TradingView remain after strategy stability.
 15. **Execution discussion only:** Bybit orders may be considered after all safety gates and explicit user approval.
-16. **Product / Support / Official Links (deferred, after the active delivery queue):** prepare non-commercial product identity, official-link configuration and local Help Center UI without payments, accounts or trading access.
+16. **Product / Support / Official Links (foundation delivered):** centralized configuration, About & Support and local Help Center are present; real URLs and later commercial policy remain separate future work.
 
 Local monitor-only `ENTRY_CONFIRMED` popups and public WebSocket price updates are already delivered. Phase 14 refers only to external TradingView/Telegram delivery and remains gated by strategy stability.
 

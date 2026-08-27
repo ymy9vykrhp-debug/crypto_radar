@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:crypto_radar/localization/app_strings.dart';
 import 'package:crypto_radar/models/crypto_universe_models.dart';
+import 'package:crypto_radar/models/market_models.dart';
 import 'package:crypto_radar/screens/asset_explorer_screen.dart';
 import 'package:crypto_radar/services/bybit_service.dart';
 import 'package:crypto_radar/services/app_preferences_controller.dart';
@@ -67,6 +68,9 @@ void main() {
         ]);
         expect(assets.first.change24hPercent, 2.5);
         expect(assets.last.maxLeverage, 10);
+        expect(assets.last.tickSize, 0.0001);
+        expect(assets.last.quantityStep, 0.1);
+        expect(assets.first.spreadPercent, greaterThan(0));
         expect(
           requests.where((Uri uri) => uri.path.endsWith('/instruments-info')),
           hasLength(2),
@@ -80,6 +84,43 @@ void main() {
         client.close();
       },
     );
+
+    test('normalizes Bybit orderbook, funding and open interest', () async {
+      final MockClient client = MockClient((http.Request request) async {
+        if (request.url.path.endsWith('/tickers')) {
+          return _ok(<String, Object?>{
+            'list': <Object?>[
+              _ticker('BTCUSDT', price: 64000, turnover: 3000000000),
+            ],
+          });
+        }
+        if (request.url.path.endsWith('/orderbook')) {
+          return _ok(<String, Object?>{
+            'b': <Object?>[
+              <Object?>['63999.5', '2.0'],
+            ],
+            'a': <Object?>[
+              <Object?>['64000.5', '1.5'],
+            ],
+            'ts': '1700000000000',
+          });
+        }
+        return http.Response('not found', 404);
+      });
+
+      final TickerStats ticker = await BybitService(client)
+          .loadTicker('BTCUSDT');
+
+      expect(ticker.bidPrice, 63999.5);
+      expect(ticker.askPrice, 64000.5);
+      expect(ticker.spreadPercent, closeTo(0.0015625, 0.000001));
+      expect(ticker.markPrice, 64001);
+      expect(ticker.indexPrice, 64002);
+      expect(ticker.fundingRatePercent, 0.01);
+      expect(ticker.openInterest, 1250);
+      expect(ticker.hasMicrostructure, isTrue);
+      client.close();
+    });
 
     test(
       'categories, sorting, search, favorites and cache work locally',
@@ -222,6 +263,12 @@ Map<String, Object?> _instrument(
   'status': 'Trading',
   'launchTime': '1700000000000',
   'leverageFilter': <String, Object?>{'maxLeverage': '10'},
+  'priceFilter': <String, Object?>{'tickSize': '0.0001'},
+  'lotSizeFilter': <String, Object?>{
+    'qtyStep': '0.1',
+    'minOrderQty': '0.1',
+    'minNotionalValue': '5',
+  },
 };
 
 Map<String, Object?> _ticker(
@@ -238,6 +285,13 @@ Map<String, Object?> _ticker(
   'volume24h': '${turnover / price}',
   'highPrice24h': '$high',
   'lowPrice24h': '$low',
+  'bid1Price': '${price - price * 0.0001}',
+  'ask1Price': '${price + price * 0.0001}',
+  'markPrice': '64001',
+  'indexPrice': '64002',
+  'fundingRate': '0.0001',
+  'openInterest': '1250',
+  'openInterestValue': '80000000',
 };
 
 class _MemoryStorage implements LocalStorageBackend {

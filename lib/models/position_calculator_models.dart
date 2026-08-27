@@ -162,6 +162,7 @@ class SmartPositionInput {
     this.minOrderQuantity = 0.0,
     this.minNotional = 0.0,
     this.tickSize = 0.0,
+    this.observedSpreadPercent = 0.0,
   });
 
   factory SmartPositionInput.fromDecision({
@@ -171,6 +172,10 @@ class SmartPositionInput {
     required double riskPercent,
     double volatilityPercent = 0.0,
     double exchangeMaxLeverage = 10.0,
+    double quantityStep = 0.0,
+    double minOrderQuantity = 0.0,
+    double minNotional = 0.0,
+    double tickSize = 0.0,
   }) {
     final double entry = (decision.entryLow + decision.entryHigh) / 2.0;
     final double atrPercent = entry <= 0 ? 0 : decision.atr / entry * 100.0;
@@ -202,6 +207,11 @@ class SmartPositionInput {
       exchangeMaxLeverage: exchangeMaxLeverage <= 0
           ? 10.0
           : exchangeMaxLeverage,
+      quantityStep: quantityStep,
+      minOrderQuantity: minOrderQuantity,
+      minNotional: minNotional,
+      tickSize: tickSize,
+      observedSpreadPercent: market.ticker.spreadPercent,
       assetRiskClass: _classifyAsset(market.symbol),
       hasSharpImpulse: decision.expectedMovePercent >= 4.0 || atrPercent >= 2.0,
       isChaos: effectiveVolatility >= 30.0 || atrPercent >= 3.0,
@@ -236,6 +246,7 @@ class SmartPositionInput {
   final double minOrderQuantity;
   final double minNotional;
   final double tickSize;
+  final double observedSpreadPercent;
 
   double get atrPercent => entry <= 0 ? 0 : atr / entry * 100.0;
 
@@ -254,6 +265,7 @@ class SmartPositionInput {
     double? minOrderQuantity,
     double? minNotional,
     double? tickSize,
+    double? observedSpreadPercent,
   }) {
     return SmartPositionInput(
       symbol: symbol,
@@ -284,6 +296,8 @@ class SmartPositionInput {
       minOrderQuantity: minOrderQuantity ?? this.minOrderQuantity,
       minNotional: minNotional ?? this.minNotional,
       tickSize: tickSize ?? this.tickSize,
+      observedSpreadPercent:
+          observedSpreadPercent ?? this.observedSpreadPercent,
     );
   }
 }

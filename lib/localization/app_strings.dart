@@ -26,6 +26,8 @@ class AppStrings {
         return pick('Исследование', 'Research');
       case AppSection.news:
         return pick('Новости', 'News');
+      case AppSection.help:
+        return pick('Помощь', 'Help');
       case AppSection.integrations:
         return pick('Интеграции', 'Integrations');
       case AppSection.settings:

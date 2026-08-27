@@ -73,11 +73,39 @@ class TickerStats {
     required this.price,
     required this.change24hPercent,
     required this.turnover24h,
+    this.bidPrice = 0.0,
+    this.askPrice = 0.0,
+    this.markPrice = 0.0,
+    this.indexPrice = 0.0,
+    this.fundingRatePercent = 0.0,
+    this.openInterest = 0.0,
+    this.openInterestValue = 0.0,
+    this.orderBookUpdatedAt,
   });
 
   final double price;
   final double change24hPercent;
   final double turnover24h;
+  final double bidPrice;
+  final double askPrice;
+  final double markPrice;
+  final double indexPrice;
+  final double fundingRatePercent;
+  final double openInterest;
+  final double openInterestValue;
+  final DateTime? orderBookUpdatedAt;
+
+  double get spread {
+    if (bidPrice <= 0 || askPrice <= 0 || askPrice < bidPrice) return 0.0;
+    return askPrice - bidPrice;
+  }
+
+  double get spreadPercent {
+    final double midpoint = (bidPrice + askPrice) / 2.0;
+    return midpoint <= 0 ? 0.0 : spread / midpoint * 100.0;
+  }
+
+  bool get hasMicrostructure => bidPrice > 0 && askPrice > 0;
 }
 
 class MacdResult {

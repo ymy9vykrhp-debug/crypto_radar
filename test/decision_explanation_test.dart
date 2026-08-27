@@ -1,5 +1,6 @@
 import 'package:crypto_radar/engines/decision_engine.dart';
 import 'package:crypto_radar/engines/explanation_engine.dart';
+import 'package:crypto_radar/engines/help_engine.dart';
 import 'package:crypto_radar/models/decision_models.dart';
 import 'package:crypto_radar/models/market_models.dart';
 import 'package:crypto_radar/screens/why_now_screen.dart';
@@ -44,6 +45,17 @@ void main() {
     expect(explanation.whyDecision, contains('осознанный результат'));
     expect(explanation.opposing, isNotEmpty);
     expect(explanation.whatChangesMind, hasLength(2));
+  });
+
+  test('help engine is a read-only projection of one decision snapshot', () {
+    final DecisionSnapshot decision = DecisionEngine.build(_market());
+    final help = HelpEngine.contextual(decision);
+
+    expect(identical(help.decision, decision), isTrue);
+    expect(help.summary, contains('SignalEngine'));
+    expect(help.supporting, isNotEmpty);
+    expect(help.nextSteps, isNotEmpty);
+    expect(HelpEngine.articles.map((article) => article.id), contains('risk'));
   });
 
   testWidgets('WHY screen shows support and counterarguments', (

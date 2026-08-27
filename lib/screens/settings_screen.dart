@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../config/product_links_config.dart';
 import '../localization/app_strings.dart';
 import '../models/position_calculator_models.dart';
 import '../services/app_preferences_controller.dart';
@@ -126,6 +127,12 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
+        const ProductExpandableSection(
+          title: 'About & Support',
+          icon: Icons.info_outline_rounded,
+          child: _AboutSupportSettings(),
+        ),
+        const SizedBox(height: 10),
         _PlannedSettingsGroup(
           title: strings.pick('Данные и исследование', 'Data and Research'),
           icon: Icons.storage_outlined,
@@ -136,6 +143,71 @@ class SettingsScreen extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _AboutSupportSettings extends StatelessWidget {
+  const _AboutSupportSettings();
+
+  @override
+  Widget build(BuildContext context) {
+    const ProductLinksConfig links = ProductLinksConfig.current;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const ListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.radar_rounded),
+          title: Text(
+            'Crypto Radar · v1.0.0 Beta',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          subtitle: Text(
+            'Build 1 · Strategy STANDARD_CONFIRMATION_V1 · Data Engine BYBIT_PUBLIC_V2',
+          ),
+        ),
+        _ProductLinkStatus(label: 'Website', value: links.websiteUrl),
+        _ProductLinkStatus(
+          label: 'Official Telegram Signals',
+          value: links.telegramSignalsUrl,
+        ),
+        _ProductLinkStatus(
+          label: 'Telegram Community',
+          value: links.telegramCommunityUrl,
+        ),
+        _ProductLinkStatus(label: 'Support', value: links.telegramSupportUrl),
+        _ProductLinkStatus(
+          label: 'Documentation',
+          value: links.documentationUrl,
+        ),
+        _ProductLinkStatus(label: 'Changelog', value: links.changelogUrl),
+      ],
+    );
+  }
+}
+
+class _ProductLinkStatus extends StatelessWidget {
+  const _ProductLinkStatus({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool configured = value.trim().isNotEmpty;
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      enabled: configured,
+      title: Text(label),
+      trailing: ProductStatusChip(
+        label: configured ? 'CONFIGURED' : 'NOT CONFIGURED',
+        color: configured
+            ? Theme.of(context).colorScheme.primary
+            : Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
     );
   }
 }

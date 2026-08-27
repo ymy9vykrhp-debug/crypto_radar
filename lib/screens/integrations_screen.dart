@@ -1,69 +1,387 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../localization/app_strings.dart';
+import '../models/integration_models.dart';
+import '../models/market_models.dart';
+import '../services/app_preferences_controller.dart';
+import '../services/notifications/telegram_controller.dart';
+import '../theme/app_theme.dart';
 import '../widgets/product_components.dart';
 
-class IntegrationsScreen extends StatelessWidget {
-  const IntegrationsScreen({super.key});
+class IntegrationsScreen extends StatefulWidget {
+  const IntegrationsScreen({
+    super.key,
+    required this.preferences,
+    required this.telegramController,
+    this.ticker,
+  });
+
+  final AppPreferencesController preferences;
+  final TelegramController telegramController;
+  final TickerStats? ticker;
+
+  @override
+  State<IntegrationsScreen> createState() => _IntegrationsScreenState();
+}
+
+class _IntegrationsScreenState extends State<IntegrationsScreen> {
+  late final TextEditingController _relayController;
+
+  @override
+  void initState() {
+    super.initState();
+    _relayController = TextEditingController(
+      text: widget.preferences.telegramRelayConfig.baseUrl,
+    );
+  }
+
+  @override
+  void dispose() {
+    _relayController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final AppStrings strings = context.strings;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-      children: <Widget>[
-        SectionHeading(
-          title: strings.pick('Интеграции', 'Integrations'),
-          subtitle: strings.pick(
-            'Источники данных и будущие внешние подключения',
-            'Data sources and future external connections',
-          ),
-          icon: Icons.hub_outlined,
-        ),
-        const SizedBox(height: 14),
-        _IntegrationTile(
-          icon: Icons.currency_bitcoin_rounded,
-          title: 'Bybit Linear Market Data',
-          description: strings.pick(
-            'Публичные свечи и тикер. Баланс, позиции и отправка ордеров не используются.',
-            'Public candles and ticker. Balance, positions and order placement are not used.',
-          ),
-          status: strings.active,
-          active: true,
-        ),
-        const SizedBox(height: 10),
-        _IntegrationTile(
-          icon: Icons.candlestick_chart_outlined,
-          title: 'TradingView / Pine Script',
-          description: strings.pick(
-            'Внешний индикатор рассматривается после стабилизации стратегии.',
-            'An external indicator is considered after strategy stabilization.',
-          ),
-          status: strings.planned,
-        ),
-        const SizedBox(height: 10),
-        _IntegrationTile(
-          icon: Icons.notifications_none_rounded,
-          title: strings.pick('Центр уведомлений', 'Alert Center'),
-          description: strings.pick(
-            'Critical, Important и Info будут отделены от журнала.',
-            'Critical, Important and Info will remain separate from the journal.',
-          ),
-          status: strings.planned,
-        ),
-        const SizedBox(height: 10),
-        _IntegrationTile(
-          icon: Icons.lock_outline_rounded,
-          title: strings.pick('Реальная торговля Bybit', 'Bybit live trading'),
-          description: strings.pick(
-            'Отключена на текущем этапе проекта.',
-            'Disabled at the current project stage.',
-          ),
-          status: strings.disabled,
-        ),
-      ],
+    return AnimatedBuilder(
+      animation: Listenable.merge(<Listenable>[
+        widget.preferences,
+        widget.telegramController,
+      ]),
+      builder: (BuildContext context, Widget? child) {
+        final TelegramRelayConfig config =
+            widget.preferences.telegramRelayConfig;
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+          children: <Widget>[
+            SectionHeading(
+              title: strings.pick('Интеграции', 'Integrations'),
+              subtitle: strings.pick(
+                'Публичные данные, безопасные уведомления и режимы исполнения',
+                'Public data, safe notifications and execution modes',
+              ),
+              icon: Icons.hub_outlined,
+            ),
+            const SizedBox(height: 14),
+            _BybitDataCard(ticker: widget.ticker),
+            const SizedBox(height: 10),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    SectionHeading(
+                      title: 'Official Crypto Radar Telegram',
+                      subtitle: strings.pick(
+                        'Только исходящие уведомления · без токена в браузере · без ордеров',
+                        'Outgoing alerts only · no browser token · no orders',
+                      ),
+                      icon: Icons.send_outlined,
+                      trailing: ProductStatusChip(
+                        label: widget.telegramController.status.message,
+                        color: _statusColor(
+                          context,
+                          widget.telegramController.status.state,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        strings.pick(
+                          'Отправлять подтверждённые сигналы',
+                          'Send confirmed signals',
+                        ),
+                      ),
+                      subtitle: Text(
+                        strings.pick(
+                          'Только новые ENTRY_CONFIRMED, прошедшие текущий фильтр силы.',
+                          'Only new ENTRY_CONFIRMED events passing the strength gate.',
+                        ),
+                      ),
+                      value: config.enabled,
+                      onChanged: (bool enabled) {
+                        widget.preferences.setTelegramRelayConfig(
+                          config.copyWith(enabled: enabled),
+                        );
+                        unawaited(widget.telegramController.refreshStatus());
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: 420,
+                      child: TextField(
+                        controller: _relayController,
+                        decoration: const InputDecoration(
+                          labelText: 'Local relay URL',
+                          helperText: 'Default: http://127.0.0.1:8787',
+                          prefixIcon: Icon(Icons.dns_outlined),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: <Widget>[
+                        FilledButton.tonalIcon(
+                          onPressed: widget.telegramController.busy
+                              ? null
+                              : () {
+                                  widget.preferences.setTelegramRelayConfig(
+                                    config.copyWith(
+                                      baseUrl: _relayController.text.trim(),
+                                    ),
+                                  );
+                                  unawaited(
+                                    widget.telegramController.refreshStatus(),
+                                  );
+                                },
+                          icon: const Icon(Icons.link_rounded),
+                          label: Text(
+                            strings.pick(
+                              'Сохранить и проверить',
+                              'Save & check',
+                            ),
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed:
+                              config.enabled && !widget.telegramController.busy
+                              ? () => unawaited(
+                                  widget.telegramController.sendTest(),
+                                )
+                              : null,
+                          icon: const Icon(Icons.send_rounded),
+                          label: Text(
+                            strings.pick('Отправить тест', 'Send test'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (widget.telegramController.lastDelivery !=
+                        null) ...<Widget>[
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.telegramController.lastDelivery!,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    Text(
+                      strings.pick(
+                        'Bot Token и Chat ID задаются только переменными окружения локального relay. Они не сохраняются в Crypto Radar.',
+                        'Bot Token and Chat ID are supplied only to the local relay through environment variables. Crypto Radar never stores them.',
+                      ),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            const _ExecutionModesCard(),
+            const SizedBox(height: 10),
+            _IntegrationTile(
+              icon: Icons.account_balance_outlined,
+              title: 'OKX / Binance / Coinbase Market Data',
+              description: strings.pick(
+                'Общий MarketDataProvider готов. Адаптеры подключаются по очереди без изменения SignalEngine.',
+                'The shared MarketDataProvider boundary is ready. Adapters can be added without changing SignalEngine.',
+              ),
+              status: strings.planned,
+            ),
+            const SizedBox(height: 10),
+            _IntegrationTile(
+              icon: Icons.call_split_rounded,
+              title: 'External Signal Sources',
+              description: strings.pick(
+                'Изолированный будущий Parser → Analysis → Filters. Никогда не отправляет ордера напрямую.',
+                'Future isolated Parser → Analysis → Filters pipeline. It never places orders directly.',
+              ),
+              status: strings.planned,
+            ),
+          ],
+        );
+      },
     );
   }
+
+  Color _statusColor(BuildContext context, IntegrationConnectionState state) {
+    final RadarSemanticColors semantic = Theme.of(context)
+        .extension<RadarSemanticColors>()!;
+    return switch (state) {
+      IntegrationConnectionState.connected => semantic.bullish,
+      IntegrationConnectionState.checking => semantic.warning,
+      IntegrationConnectionState.unavailable => semantic.bearish,
+      IntegrationConnectionState.disabled ||
+      IntegrationConnectionState.notConfigured => semantic.neutral,
+    };
+  }
+}
+
+class _BybitDataCard extends StatelessWidget {
+  const _BybitDataCard({this.ticker});
+
+  final TickerStats? ticker;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppStrings strings = context.strings;
+    final TickerStats? data = ticker;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            SectionHeading(
+              title: 'Bybit Linear Market Data',
+              subtitle: strings.pick(
+                'Свечи, bid/ask, стакан L1, mark/index, funding и Open Interest',
+                'Candles, bid/ask, L1 book, mark/index, funding and Open Interest',
+              ),
+              icon: Icons.currency_bitcoin_rounded,
+              trailing: ProductStatusChip(
+                label: data == null ? strings.notConnected : strings.active,
+                color: data == null
+                    ? Theme.of(context).colorScheme.onSurfaceVariant
+                    : Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 18,
+              runSpacing: 8,
+              children: <Widget>[
+                _DataValue(label: 'Bid', value: _price(data?.bidPrice)),
+                _DataValue(label: 'Ask', value: _price(data?.askPrice)),
+                _DataValue(
+                  label: 'Spread',
+                  value: data == null
+                      ? '—'
+                      : '${data.spreadPercent.toStringAsFixed(4)}%',
+                ),
+                _DataValue(label: 'Mark', value: _price(data?.markPrice)),
+                _DataValue(label: 'Index', value: _price(data?.indexPrice)),
+                _DataValue(
+                  label: 'Funding',
+                  value: data == null
+                      ? '—'
+                      : '${data.fundingRatePercent.toStringAsFixed(4)}%',
+                ),
+                _DataValue(
+                  label: 'Open Interest',
+                  value: data == null
+                      ? '—'
+                      : data.openInterest.toStringAsFixed(2),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExecutionModesCard extends StatelessWidget {
+  const _ExecutionModesCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final AppStrings strings = context.strings;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            SectionHeading(
+              title: strings.pick('Исполнение сделок', 'Trade Execution'),
+              subtitle: strings.pick(
+                'Режимы разделены и не включаются обычным переключателем',
+                'Modes are isolated and cannot be enabled with a preference toggle',
+              ),
+              icon: Icons.security_rounded,
+            ),
+            const SizedBox(height: 8),
+            const _ModeRow(
+              label: 'OFF / MONITOR',
+              status: 'ACTIVE',
+              active: true,
+            ),
+            const _ModeRow(label: 'PAPER', status: 'NOT CONFIGURED'),
+            const _ModeRow(label: 'BYBIT DEMO', status: 'NOT CONFIGURED'),
+            const _ModeRow(
+              label: 'BYBIT LIVE',
+              status: 'HARD BLOCKED',
+              blocked: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ModeRow extends StatelessWidget {
+  const _ModeRow({
+    required this.label,
+    required this.status,
+    this.active = false,
+    this.blocked = false,
+  });
+
+  final String label;
+  final String status;
+  final bool active;
+  final bool blocked;
+
+  @override
+  Widget build(BuildContext context) {
+    final RadarSemanticColors semantic = Theme.of(context)
+        .extension<RadarSemanticColors>()!;
+    final Color color = active
+        ? semantic.bullish
+        : blocked
+        ? semantic.bearish
+        : semantic.neutral;
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        active ? Icons.visibility_outlined : Icons.lock_outline,
+        color: color,
+      ),
+      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+      trailing: ProductStatusChip(label: status, color: color),
+    );
+  }
+}
+
+class _DataValue extends StatelessWidget {
+  const _DataValue({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 130,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(label, style: Theme.of(context).textTheme.labelSmall),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
+      ],
+    ),
+  );
 }
 
 class _IntegrationTile extends StatelessWidget {
@@ -72,20 +390,16 @@ class _IntegrationTile extends StatelessWidget {
     required this.title,
     required this.description,
     required this.status,
-    this.active = false,
   });
 
   final IconData icon;
   final String title;
   final String description;
   final String status;
-  final bool active;
 
   @override
   Widget build(BuildContext context) {
-    final Color color = active
-        ? Theme.of(context).colorScheme.primary
-        : Theme.of(context).colorScheme.onSurfaceVariant;
+    final Color color = Theme.of(context).colorScheme.onSurfaceVariant;
     return Card(
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
@@ -95,12 +409,13 @@ class _IntegrationTile extends StatelessWidget {
           padding: const EdgeInsets.only(top: 6),
           child: Text(description),
         ),
-        trailing: ProductStatusChip(
-          label: status,
-          color: color,
-          icon: active ? Icons.check_circle_outline : Icons.schedule_outlined,
-        ),
+        trailing: ProductStatusChip(label: status, color: color),
       ),
     );
   }
+}
+
+String _price(double? value) {
+  if (value == null || !value.isFinite || value <= 0) return '—';
+  return value >= 1 ? value.toStringAsFixed(4) : value.toStringAsFixed(7);
 }

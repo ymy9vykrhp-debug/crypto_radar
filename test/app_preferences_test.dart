@@ -1,4 +1,5 @@
 import 'package:crypto_radar/localization/app_strings.dart';
+import 'package:crypto_radar/models/integration_models.dart';
 import 'package:crypto_radar/models/position_calculator_models.dart';
 import 'package:crypto_radar/services/app_preferences_controller.dart';
 import 'package:crypto_radar/services/storage/local_storage_base.dart';
@@ -40,6 +41,12 @@ void main() {
     first.setFeeModel(
       first.feeModel.copyWith(makerFeePercent: 0.01, stopSlippagePercent: 0.08),
     );
+    first.setTelegramRelayConfig(
+      const TelegramRelayConfig(
+        enabled: true,
+        baseUrl: 'http://127.0.0.1:9999',
+      ),
+    );
     await first.flushPendingWrites();
 
     final AppPreferencesController restored = AppPreferencesController(
@@ -51,6 +58,8 @@ void main() {
     expect(restored.effectiveRiskPercent, 2.5);
     expect(restored.feeModel.makerFeePercent, 0.01);
     expect(restored.feeModel.stopSlippagePercent, 0.08);
+    expect(restored.telegramRelayConfig.enabled, isTrue);
+    expect(restored.telegramRelayConfig.baseUrl, 'http://127.0.0.1:9999');
   });
 }
 

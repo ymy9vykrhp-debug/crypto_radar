@@ -17,6 +17,8 @@ IconData appSectionIcon(AppSection section) {
       return Icons.science_outlined;
     case AppSection.news:
       return Icons.article_outlined;
+    case AppSection.help:
+      return Icons.support_agent_outlined;
     case AppSection.integrations:
       return Icons.hub_outlined;
     case AppSection.settings:

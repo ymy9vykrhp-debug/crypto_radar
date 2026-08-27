@@ -4,14 +4,20 @@ import 'package:http/http.dart' as http;
 
 import '../engines/signal_engine.dart';
 import '../models/crypto_universe_models.dart';
+import '../models/market_data_models.dart';
 import '../models/market_models.dart';
+import 'market_data_provider.dart';
 
-class BybitService {
+class BybitService implements MarketDataProvider {
   BybitService(this._client);
 
   final http.Client _client;
   static const String _baseUrl = 'https://api.bybit.com';
 
+  @override
+  ExchangeVenue get venue => ExchangeVenue.bybit;
+
+  @override
   Future<List<CryptoAsset>> loadCryptoUniverse() async {
     final List<_InstrumentSpec> instruments = await _loadLinearInstruments();
     final Map<String, Map<String, dynamic>> tickers =
@@ -41,6 +47,16 @@ class BybitService {
                 low24h: _toDouble(ticker['lowPrice24h']),
                 launchTime: instrument.launchTime,
                 maxLeverage: instrument.maxLeverage,
+                bidPrice: _toDouble(ticker['bid1Price']),
+                askPrice: _toDouble(ticker['ask1Price']),
+                markPrice: _toDouble(ticker['markPrice']),
+                indexPrice: _toDouble(ticker['indexPrice']),
+                fundingRatePercent: _toDouble(ticker['fundingRate']) * 100.0,
+                openInterest: _toDouble(ticker['openInterest']),
+                tickSize: instrument.tickSize,
+                quantityStep: instrument.quantityStep,
+                minOrderQuantity: instrument.minOrderQuantity,
+                minNotional: instrument.minNotional,
               );
             })
             .where((CryptoAsset asset) => asset.lastPrice > 0)
@@ -55,12 +71,13 @@ class BybitService {
     return List<CryptoAsset>.unmodifiable(assets);
   }
 
+  @override
   Future<MarketSnapshot> load(String symbol) async {
     final Future<List<Candle>> oneFuture = loadCandles(symbol, '1');
     final Future<List<Candle>> fiveFuture = loadCandles(symbol, '5');
     final Future<List<Candle>> fifteenFuture = loadCandles(symbol, '15');
     final Future<List<Candle>> hourFuture = loadCandles(symbol, '60');
-    final Future<TickerStats> tickerFuture = _loadTicker(symbol);
+    final Future<TickerStats> tickerFuture = loadTicker(symbol);
 
     final List<Candle> oneCandles = await oneFuture;
     final List<Candle> fiveCandles = await fiveFuture;
@@ -96,6 +113,7 @@ class BybitService {
     );
   }
 
+  @override
   Future<List<Candle>> loadCandles(
     String symbol,
     String interval, {
@@ -154,6 +172,7 @@ class BybitService {
     return candles.reversed.toList(growable: false);
   }
 
+  @override
   Future<List<Candle>> loadHistoricalCandles(
     String symbol,
     String interval, {
@@ -195,12 +214,42 @@ class BybitService {
           );
   }
 
-  Future<TickerStats> _loadTicker(String symbol) async {
-    final Uri uri = Uri.parse('$_baseUrl/v5/market/tickers').replace(
+  @override
+  Future<InstrumentTradingRules?> loadTradingRules(String symbol) async {
+    final String normalized = normalizeCryptoSymbol(symbol);
+    final List<_InstrumentSpec> instruments = await _loadLinearInstruments(
+      symbol: normalized,
+    );
+    for (final _InstrumentSpec instrument in instruments) {
+      if (instrument.symbol == normalized) {
+        return InstrumentTradingRules(
+          symbol: instrument.symbol,
+          venue: venue,
+          tickSize: instrument.tickSize,
+          quantityStep: instrument.quantityStep,
+          minOrderQuantity: instrument.minOrderQuantity,
+          minNotional: instrument.minNotional,
+          maxLeverage: instrument.maxLeverage,
+        );
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<TickerStats> loadTicker(String symbol) async {
+    final Uri tickerUri = Uri.parse('$_baseUrl/v5/market/tickers').replace(
       queryParameters: <String, String>{'category': 'linear', 'symbol': symbol},
     );
+    final Uri orderBookUri = Uri.parse('$_baseUrl/v5/market/orderbook').replace(
+      queryParameters: <String, String>{
+        'category': 'linear',
+        'symbol': symbol,
+        'limit': '1',
+      },
+    );
     final http.Response response = await _client
-        .get(uri)
+        .get(tickerUri)
         .timeout(const Duration(seconds: 12));
     if (response.statusCode != 200) {
       throw Exception('Bybit ticker HTTP ${response.statusCode}');
@@ -220,14 +269,45 @@ class BybitService {
     if (first is! Map<String, dynamic>) {
       throw Exception('Повреждённый ticker');
     }
+    double bid = _toDouble(first['bid1Price']);
+    double ask = _toDouble(first['ask1Price']);
+    DateTime? orderBookUpdatedAt;
+    try {
+      final http.Response orderBookResponse = await _client
+          .get(orderBookUri)
+          .timeout(const Duration(seconds: 6));
+      final Map<String, dynamic> book = _decodeResult(
+        orderBookResponse,
+        context: 'Bybit orderbook',
+      );
+      bid = _firstBookPrice(book['b']) ?? bid;
+      ask = _firstBookPrice(book['a']) ?? ask;
+      final int updateMilliseconds = _toInt(book['ts']);
+      if (updateMilliseconds > 0) {
+        orderBookUpdatedAt = DateTime.fromMillisecondsSinceEpoch(
+          updateMilliseconds,
+          isUtc: true,
+        );
+      }
+    } on Object {
+      // Ticker bid/ask remains a safe public fallback when orderbook is absent.
+    }
     return TickerStats(
       price: _toDouble(first['lastPrice']),
       change24hPercent: _toDouble(first['price24hPcnt']) * 100.0,
       turnover24h: _toDouble(first['turnover24h']),
+      bidPrice: bid,
+      askPrice: ask,
+      markPrice: _toDouble(first['markPrice']),
+      indexPrice: _toDouble(first['indexPrice']),
+      fundingRatePercent: _toDouble(first['fundingRate']) * 100.0,
+      openInterest: _toDouble(first['openInterest']),
+      openInterestValue: _toDouble(first['openInterestValue']),
+      orderBookUpdatedAt: orderBookUpdatedAt,
     );
   }
 
-  Future<List<_InstrumentSpec>> _loadLinearInstruments() async {
+  Future<List<_InstrumentSpec>> _loadLinearInstruments({String? symbol}) async {
     final List<_InstrumentSpec> instruments = <_InstrumentSpec>[];
     final Set<String> seenCursors = <String>{};
     String cursor = '';
@@ -237,6 +317,7 @@ class BybitService {
         'status': 'Trading',
         'limit': '1000',
       };
+      if (symbol != null && symbol.isNotEmpty) query['symbol'] = symbol;
       if (cursor.isNotEmpty) query['cursor'] = cursor;
       final Uri uri = Uri.parse('$_baseUrl/v5/market/instruments-info')
           .replace(queryParameters: query);
@@ -262,6 +343,16 @@ class BybitService {
               leverageRaw is Map<String, dynamic>
               ? leverageRaw
               : <String, dynamic>{};
+          final Object? priceFilterRaw = raw['priceFilter'];
+          final Map<String, dynamic> priceFilter =
+              priceFilterRaw is Map<String, dynamic>
+              ? priceFilterRaw
+              : <String, dynamic>{};
+          final Object? lotSizeRaw = raw['lotSizeFilter'];
+          final Map<String, dynamic> lotSize =
+              lotSizeRaw is Map<String, dynamic>
+              ? lotSizeRaw
+              : <String, dynamic>{};
           final int launchMilliseconds = _toInt(raw['launchTime']);
           instruments.add(
             _InstrumentSpec(
@@ -277,6 +368,10 @@ class BybitService {
                       isUtc: true,
                     ),
               maxLeverage: _toDouble(leverage['maxLeverage']),
+              tickSize: _toDouble(priceFilter['tickSize']),
+              quantityStep: _toDouble(lotSize['qtyStep']),
+              minOrderQuantity: _toDouble(lotSize['minOrderQty']),
+              minNotional: _toDouble(lotSize['minNotionalValue']),
             ),
           );
         }
@@ -347,6 +442,14 @@ class BybitService {
     return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
+  static double? _firstBookPrice(Object? rawLevels) {
+    if (rawLevels is! List<dynamic> || rawLevels.isEmpty) return null;
+    final Object? first = rawLevels.first;
+    if (first is! List<dynamic> || first.isEmpty) return null;
+    final double price = _toDouble(first.first);
+    return price > 0 ? price : null;
+  }
+
   static int _clampInt(int value, int minimum, int maximum) {
     if (value < minimum) {
       return minimum;
@@ -367,6 +470,10 @@ class _InstrumentSpec {
     required this.status,
     required this.launchTime,
     required this.maxLeverage,
+    required this.tickSize,
+    required this.quantityStep,
+    required this.minOrderQuantity,
+    required this.minNotional,
   });
 
   final String symbol;
@@ -376,4 +483,8 @@ class _InstrumentSpec {
   final String status;
   final DateTime? launchTime;
   final double maxLeverage;
+  final double tickSize;
+  final double quantityStep;
+  final double minOrderQuantity;
+  final double minNotional;
 }

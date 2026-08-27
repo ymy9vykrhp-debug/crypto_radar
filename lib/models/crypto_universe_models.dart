@@ -24,6 +24,16 @@ class CryptoAsset {
     required this.low24h,
     required this.launchTime,
     required this.maxLeverage,
+    this.bidPrice = 0.0,
+    this.askPrice = 0.0,
+    this.markPrice = 0.0,
+    this.indexPrice = 0.0,
+    this.fundingRatePercent = 0.0,
+    this.openInterest = 0.0,
+    this.tickSize = 0.0,
+    this.quantityStep = 0.0,
+    this.minOrderQuantity = 0.0,
+    this.minNotional = 0.0,
   });
 
   final String symbol;
@@ -39,6 +49,22 @@ class CryptoAsset {
   final double low24h;
   final DateTime? launchTime;
   final double maxLeverage;
+  final double bidPrice;
+  final double askPrice;
+  final double markPrice;
+  final double indexPrice;
+  final double fundingRatePercent;
+  final double openInterest;
+  final double tickSize;
+  final double quantityStep;
+  final double minOrderQuantity;
+  final double minNotional;
+
+  double get spreadPercent {
+    final double midpoint = (bidPrice + askPrice) / 2.0;
+    if (midpoint <= 0 || askPrice < bidPrice) return 0.0;
+    return (askPrice - bidPrice) / midpoint * 100.0;
+  }
 
   double get volatilityPercent {
     if (lastPrice <= 0 || high24h <= 0 || low24h <= 0) return 0;
@@ -64,6 +90,16 @@ class CryptoAsset {
     'low24h': low24h,
     'launchTime': launchTime?.millisecondsSinceEpoch,
     'maxLeverage': maxLeverage,
+    'bidPrice': bidPrice,
+    'askPrice': askPrice,
+    'markPrice': markPrice,
+    'indexPrice': indexPrice,
+    'fundingRatePercent': fundingRatePercent,
+    'openInterest': openInterest,
+    'tickSize': tickSize,
+    'quantityStep': quantityStep,
+    'minOrderQuantity': minOrderQuantity,
+    'minNotional': minNotional,
   };
 
   factory CryptoAsset.fromJson(Map<String, dynamic> json) {
@@ -87,6 +123,16 @@ class CryptoAsset {
               isUtc: true,
             ),
       maxLeverage: _asDouble(json['maxLeverage']),
+      bidPrice: _asDouble(json['bidPrice']),
+      askPrice: _asDouble(json['askPrice']),
+      markPrice: _asDouble(json['markPrice']),
+      indexPrice: _asDouble(json['indexPrice']),
+      fundingRatePercent: _asDouble(json['fundingRatePercent']),
+      openInterest: _asDouble(json['openInterest']),
+      tickSize: _asDouble(json['tickSize']),
+      quantityStep: _asDouble(json['quantityStep']),
+      minOrderQuantity: _asDouble(json['minOrderQuantity']),
+      minNotional: _asDouble(json['minNotional']),
     );
   }
 }

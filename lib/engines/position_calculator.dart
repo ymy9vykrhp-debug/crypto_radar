@@ -11,7 +11,10 @@ class PositionCalculator {
     required SmartPositionInput input,
     required FeeModel feeModel,
   }) {
-    final List<String> blockingReasons = _validate(input, feeModel);
+    final FeeModel effectiveFeeModel = input.observedSpreadPercent > 0
+        ? feeModel.copyWith(estimatedSpreadPercent: input.observedSpreadPercent)
+        : feeModel;
+    final List<String> blockingReasons = _validate(input, effectiveFeeModel);
     final double margin = _positive(input.allocatedMargin);
     final double riskPercent = _positive(input.riskPercent);
     final double maxLoss = margin * riskPercent / 100.0;
@@ -24,11 +27,13 @@ class PositionCalculator {
     final double effectiveLossPercent = entry == 0 || stop == 0
         ? 0.0
         : stopDistancePercent +
-              feeModel.feePercent(feeModel.entryOrderType) +
-              feeModel.feePercent(feeModel.stopOrderType) * stop / entry +
-              feeModel.estimatedSpreadPercent +
-              feeModel.stopSlippagePercent * stop / entry +
-              feeModel.safetyBufferPercent;
+              effectiveFeeModel.feePercent(effectiveFeeModel.entryOrderType) +
+              effectiveFeeModel.feePercent(effectiveFeeModel.stopOrderType) *
+                  stop /
+                  entry +
+              effectiveFeeModel.estimatedSpreadPercent +
+              effectiveFeeModel.stopSlippagePercent * stop / entry +
+              effectiveFeeModel.safetyBufferPercent;
     final double effectiveLossRate = effectiveLossPercent / 100.0;
     final double maxNotionalByRisk =
         maxLoss > 0 && effectiveLossRate > 0 && effectiveLossRate.isFinite
@@ -39,7 +44,7 @@ class PositionCalculator {
         : 0.0;
     final LeverageSafetyResult leverageSafety = LeverageSafety.evaluate(
       input: input,
-      feeModel: feeModel,
+      feeModel: effectiveFeeModel,
       calculatedLeverage: calculatedLeverage,
       stopDistancePercent: stopDistancePercent,
     );
@@ -74,7 +79,7 @@ class PositionCalculator {
 
     final StopOutcome stopOutcome = _stopOutcome(
       input: input,
-      feeModel: feeModel,
+      feeModel: effectiveFeeModel,
       quantity: quantity,
       notional: positionNotional,
     );
@@ -89,7 +94,7 @@ class PositionCalculator {
         label: 'TP1',
         target: input.tp1,
         input: input,
-        feeModel: feeModel,
+        feeModel: effectiveFeeModel,
         quantity: quantity,
         notional: positionNotional,
         stopOutcome: stopOutcome,
@@ -98,7 +103,7 @@ class PositionCalculator {
         label: 'TP2',
         target: input.tp2,
         input: input,
-        feeModel: feeModel,
+        feeModel: effectiveFeeModel,
         quantity: quantity,
         notional: positionNotional,
         stopOutcome: stopOutcome,
@@ -108,7 +113,7 @@ class PositionCalculator {
           label: 'TP3',
           target: input.tp3!,
           input: input,
-          feeModel: feeModel,
+          feeModel: effectiveFeeModel,
           quantity: quantity,
           notional: positionNotional,
           stopOutcome: stopOutcome,
@@ -123,7 +128,7 @@ class PositionCalculator {
       label: 'TARGET MOVE',
       target: targetMovePrice,
       input: input,
-      feeModel: feeModel,
+      feeModel: effectiveFeeModel,
       quantity: quantity,
       notional: positionNotional,
       stopOutcome: stopOutcome,
@@ -157,7 +162,7 @@ class PositionCalculator {
       effectiveLossPercent: effectiveLossPercent,
       maxNotionalByRisk: maxNotionalByRisk,
       leverageSafety: leverageSafety,
-      feeModel: feeModel,
+      feeModel: effectiveFeeModel,
     );
 
     return SmartTradePlan(

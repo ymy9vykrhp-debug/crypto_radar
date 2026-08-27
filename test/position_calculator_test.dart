@@ -137,6 +137,20 @@ void main() {
       );
     });
 
+    test('observed public spread overrides the configured estimate', () {
+      final SmartTradePlan estimated = _calculate(_input());
+      final SmartTradePlan observed = _calculate(
+        _input().copyWith(observedSpreadPercent: 0.25),
+      );
+
+      expect(
+        observed.effectiveLossPercent,
+        greaterThan(estimated.effectiveLossPercent),
+      );
+      expect(observed.maxNotionalByRisk, lessThan(estimated.maxNotionalByRisk));
+      expect(observed.leverage, lessThanOrEqualTo(estimated.leverage));
+    });
+
     test('invalid LONG structural stop is blocked instead of moved', () {
       final SmartTradePlan plan = _calculate(_input(stop: 100.2));
 

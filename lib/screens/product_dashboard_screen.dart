@@ -147,6 +147,44 @@ class ProductDashboardScreen extends StatelessWidget {
                           ? semantic.bullish
                           : semantic.warning,
                     ),
+                    _metric(
+                      width,
+                      'Bid / Ask Spread',
+                      snapshot.ticker.hasMicrostructure
+                          ? '${snapshot.ticker.spreadPercent.toStringAsFixed(4)}%'
+                          : '—',
+                      Icons.swap_vert_circle_outlined,
+                      snapshot.ticker.spreadPercent <= 0.08
+                          ? semantic.bullish
+                          : semantic.warning,
+                    ),
+                    _metric(
+                      width,
+                      'Funding',
+                      '${snapshot.ticker.fundingRatePercent >= 0 ? '+' : ''}${snapshot.ticker.fundingRatePercent.toStringAsFixed(4)}%',
+                      Icons.payments_outlined,
+                      semantic.neutral,
+                    ),
+                    _metric(
+                      width,
+                      'Open Interest',
+                      _compactNumber(
+                        snapshot.ticker.openInterestValue > 0
+                            ? snapshot.ticker.openInterestValue
+                            : snapshot.ticker.openInterest,
+                      ),
+                      Icons.stacked_line_chart_rounded,
+                      semantic.neutral,
+                    ),
+                    _metric(
+                      width,
+                      'Mark / Index',
+                      snapshot.ticker.markPrice > 0
+                          ? '${_price(snapshot.ticker.markPrice)} / ${_price(snapshot.ticker.indexPrice)}'
+                          : '—',
+                      Icons.balance_outlined,
+                      semantic.neutral,
+                    ),
                   ],
                 );
               },
@@ -573,3 +611,11 @@ String _price(double value) {
 }
 
 String _nullablePrice(double? value) => value == null ? '—' : _price(value);
+
+String _compactNumber(double value) {
+  if (!value.isFinite || value <= 0) return '—';
+  if (value >= 1000000000) return '${(value / 1000000000).toStringAsFixed(2)}B';
+  if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(2)}M';
+  if (value >= 1000) return '${(value / 1000).toStringAsFixed(2)}K';
+  return value.toStringAsFixed(2);
+}

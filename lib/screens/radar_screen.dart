@@ -23,6 +23,8 @@ import '../services/journal_controller.dart';
 import '../services/journal_store.dart';
 import '../services/live_price_service.dart';
 import '../services/notification_sound_service.dart';
+import '../services/notifications/telegram_controller.dart';
+import '../services/notifications/telegram_gateway.dart';
 import '../services/trade_alert_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_navigation.dart';
@@ -32,6 +34,7 @@ import '../widgets/trade_signal_alert_dialog.dart';
 import 'asset_workspace_screen.dart';
 import 'asset_explorer_screen.dart';
 import 'integrations_screen.dart';
+import 'help_screen.dart';
 import 'journal_screen.dart';
 import 'market_scanner_screen.dart';
 import 'news_screen.dart';
@@ -62,6 +65,7 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
   late final Future<void> _journalReady;
   late final LivePriceService _livePriceService;
   late final TradeAlertController _tradeAlertController;
+  late final TelegramController _telegramController;
   final NotificationSoundPlayer _soundPlayer =
       const SystemNotificationSoundPlayer();
   Timer? _refreshTimer;
@@ -91,6 +95,10 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
     );
     _journalReady = _journalController.initialize();
     _tradeAlertController = TradeAlertController();
+    _telegramController = TelegramController(
+      preferences: widget.preferences,
+      gateway: HttpTelegramRelayGateway(_client),
+    );
     _livePriceService = LivePriceService()..addListener(_onLivePriceChanged);
     _universeController.initialize();
     if (widget.autoStart) {
@@ -106,6 +114,7 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
       ..removeListener(_onLivePriceChanged)
       ..dispose();
     _tradeAlertController.dispose();
+    _telegramController.dispose();
     _livePrice.dispose();
     _universeController.dispose();
     _journalController.dispose();
@@ -203,6 +212,7 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
       return;
     }
     _showingTradeAlert = true;
+    unawaited(_telegramController.deliver(alert));
     if (widget.preferences.soundEnabled) {
       await _soundPlayer.playStrongAlert();
     }
@@ -296,6 +306,10 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
       riskPercent: widget.preferences.effectiveRiskPercent,
       volatilityPercent: asset?.volatilityPercent ?? 0.0,
       exchangeMaxLeverage: asset?.maxLeverage ?? 10.0,
+      quantityStep: asset?.quantityStep ?? 0.0,
+      minOrderQuantity: asset?.minOrderQuantity ?? 0.0,
+      minNotional: asset?.minNotional ?? 0.0,
+      tickSize: asset?.tickSize ?? 0.0,
     );
     if (!mounted) return;
     await showDialog<void>(
@@ -306,6 +320,16 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
         preferences: widget.preferences,
       ),
     );
+  }
+
+  DecisionSnapshot? _currentDecision() {
+    final MarketSnapshot? snapshot = _snapshot;
+    if (snapshot == null) return null;
+    final RadarSignal? rawSignal = SignalEngine.createSignal(snapshot);
+    final RadarSignal? executionSignal = rawSignal == null
+        ? null
+        : PhaseAEngine.preview(market: snapshot, signal: rawSignal);
+    return DecisionEngine.build(snapshot, executionSignal: executionSignal);
   }
 
   @override
@@ -530,8 +554,14 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
         return ResearchScreen(controller: _journalController);
       case AppSection.news:
         return const NewsScreen();
+      case AppSection.help:
+        return HelpScreen(decision: _currentDecision());
       case AppSection.integrations:
-        return const IntegrationsScreen();
+        return IntegrationsScreen(
+          preferences: widget.preferences,
+          telegramController: _telegramController,
+          ticker: _snapshot?.ticker,
+        );
       case AppSection.settings:
         return SettingsScreen(preferences: widget.preferences);
     }

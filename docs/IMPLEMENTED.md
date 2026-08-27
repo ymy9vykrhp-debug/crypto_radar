@@ -108,6 +108,18 @@ Last updated: 2026-08-27
 - Future exchange constraints are represented by `qtyStep`, `minOrderQuantity`, `minNotional`, `tickSize` and exchange maximum leverage fields without pretending that account execution is connected.
 - Verification: `flutter analyze` clean; all 47 tests passed; responsive calculator widget test passed at 430 px; Chrome debug launch connected and ran without runtime errors.
 
+## DONE — Integration foundation, Bybit market depth, Telegram and Help
+
+- Added a common `MarketDataProvider` boundary and normalized exchange venue/trading-rule models. Future OKX, Binance and Coinbase adapters can feed the existing `SignalEngine` without exchange JSON leaking into strategy code.
+- Bybit public ticker data now includes bid/ask, real spread, mark/index price, funding, Open Interest and L1 orderbook timestamp. Instrument metadata retains `tickSize`, `qtyStep`, `minOrderQty`, `minNotionalValue` and maximum leverage.
+- Smart Position Calculator now receives real Bybit trading constraints and uses an observed positive bid/ask spread instead of the configured estimate when current public data is available.
+- Added explicit execution modes and an `ExecutionBroker` contract. The application uses monitor-only behavior; Paper and Demo report `NOT CONFIGURED`; the separate live broker is immutable `LIVE BLOCKED` and contains no HTTP client or credentials.
+- Added browser-safe Official Telegram delivery through a local loopback relay. The Flutter application stores only relay enablement/address; Bot Token and Chat ID exist only in relay environment variables. Unique signal ID is used for relay deduplication, and Telegram cannot access any execution broker.
+- The Integrations screen now shows Bybit market-depth fields, Telegram relay health/test delivery, future exchange adapters, isolated External Signal Sources and explicit execution-mode readiness.
+- Added a read-only Help Engine and Help Center with current Decision Snapshot explanation, Getting Started, Signals, Risk, Bybit Demo, Telegram and FAQ content.
+- Added centralized `ProductLinksConfig` plus About & Support. Missing links remain disabled and display `NOT CONFIGURED`.
+- Verification: `flutter analyze` clean; all 55 tests passed; local Telegram relay health smoke-test passed safely without secrets; Chrome debug launch connected and started the application.
+
 ## TODO
 
 - Phase 3: deeper Market Structure Engine 2.0 and correction/BOS/CHOCH event history.
@@ -116,10 +128,10 @@ Last updated: 2026-08-27
 - Phase 6: full Market Regime, Strategy Selector and explicit NO TRADE.
 - Full rolling walk-forward/OOS research, fees and slippage remain required before Paper Trading.
 - A Pine Script mirror may be added after the strategy is stable, but it would recalculate the strategy inside TradingView rather than read local Flutter signals. A licensed Advanced Charts integration is a later deployment option.
-- External alert delivery remains deferred. Local strong `ENTRY_CONFIRMED` popup delivery and deduplication are implemented.
+- Telegram outgoing `ENTRY_CONFIRMED` delivery is implemented through a local relay. Read-only commands, summaries and other external alert channels remain future work.
 - Advanced chart roadmap: Volume Profile, Footprint/Clusters, Heatmap, Order Flow, Replay, Journal trade overlays and Backtest replay.
 - Remaining UI depth: configurable Assets/Favorites/Opportunity Queue, real Alerts/News feeds, persisted UI preferences, Mistakes/Review editing and complete localization of legacy engine-generated explanation text.
-- Deferred final product layer: About Crypto Radar, centralized `ProductLinksConfig`, separately modelled Official Telegram and External Signal Sources, About & Support, sidebar links and local Help Center. UI/config only; no payments, accounts, licences or commercial backend.
+- Product identity/config/help foundation is delivered. Real official URLs, expanded support content and compact sidebar footer remain configuration/polish work.
 - Phases 7–16: see `CRYPTO_RADAR_ROADMAP.md`.
 
 ## Safety notes

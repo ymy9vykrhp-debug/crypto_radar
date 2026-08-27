@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../models/position_calculator_models.dart';
+import '../models/integration_models.dart';
 import 'storage/local_storage_backend.dart';
 
 enum AppLanguage { ru, en }
@@ -20,6 +21,7 @@ class AppPreferencesController extends ChangeNotifier {
   RiskPreset _riskPreset = RiskPreset.normal;
   double _customRiskPercent = 2.0;
   FeeModel _feeModel = const FeeModel();
+  TelegramRelayConfig _telegramRelayConfig = const TelegramRelayConfig();
   bool _initialized = false;
   Future<void> _writeQueue = Future<void>.value();
 
@@ -32,6 +34,7 @@ class AppPreferencesController extends ChangeNotifier {
       ? _customRiskPercent
       : _riskPreset.defaultPercent;
   FeeModel get feeModel => _feeModel;
+  TelegramRelayConfig get telegramRelayConfig => _telegramRelayConfig;
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -69,6 +72,10 @@ class AppPreferencesController extends ChangeNotifier {
       final Object? feeJson = decoded['feeModel'];
       if (feeJson is Map<String, dynamic>) {
         _feeModel = FeeModel.fromJson(feeJson);
+      }
+      final Object? telegramJson = decoded['telegramRelayConfig'];
+      if (telegramJson is Map<String, dynamic>) {
+        _telegramRelayConfig = TelegramRelayConfig.fromJson(telegramJson);
       }
       notifyListeners();
     } on Object {
@@ -118,6 +125,16 @@ class AppPreferencesController extends ChangeNotifier {
     _scheduleSave();
   }
 
+  void setTelegramRelayConfig(TelegramRelayConfig value) {
+    if (_telegramRelayConfig.enabled == value.enabled &&
+        _telegramRelayConfig.baseUrl == value.baseUrl) {
+      return;
+    }
+    _telegramRelayConfig = value;
+    notifyListeners();
+    _scheduleSave();
+  }
+
   void _scheduleSave() {
     final String payload = jsonEncode(<String, Object?>{
       'themeMode': _themeMode.name,
@@ -126,6 +143,7 @@ class AppPreferencesController extends ChangeNotifier {
       'riskPreset': _riskPreset.name,
       'customRiskPercent': _customRiskPercent,
       'feeModel': _feeModel.toJson(),
+      'telegramRelayConfig': _telegramRelayConfig.toJson(),
     });
     _writeQueue = _writeQueue
         .then<void>((_) => _storage.write(_storageKey, payload))
