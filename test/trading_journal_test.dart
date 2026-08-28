@@ -176,6 +176,52 @@ void main() {
       },
     );
 
+    test('realized summaries use exit time instead of entry time', () {
+      final TradeJournalEntry trade = _trade(
+        id: 'overnight',
+        exit: 102,
+        time: DateTime(2026, 8, 31, 23, 30),
+        exitTime: DateTime(2026, 9, 1, 0, 15),
+      );
+
+      final List<DailyJournalSummary> days = JournalPerformanceEngine.calendar(
+        <TradeJournalEntry>[trade],
+      );
+      final List<JournalPeriodSummary> months =
+          JournalPerformanceEngine.monthly(<TradeJournalEntry>[
+            trade,
+          ], const JournalSettings());
+
+      expect(days.single.date.month, 9);
+      expect(days.single.date.day, 1);
+      expect(months.single.start.month, 9);
+    });
+
+    test('decimal journal values survive a canonical JSON round trip', () {
+      final TradeJournalEntry original = _trade(
+        id: 'decimal-round-trip',
+        entry: 0.00000012,
+        stop: 0.00000011,
+        tp1: 0.00000013,
+        tp2: 0.00000015,
+        exit: 0.00000013,
+        fees: 0.00000007,
+      );
+      final Map<String, Object?> json = original.toJson();
+      final TradeJournalEntry restored = TradeJournalEntry.fromJson(
+        Map<String, dynamic>.from(json),
+      );
+
+      expect(json['plannedEntry'], isA<String>());
+      expect(restored.plannedEntry, original.plannedEntry);
+      expect(restored.stopLoss, original.stopLoss);
+      expect(restored.tp1, original.tp1);
+      expect(restored.actualExit, original.actualExit);
+      expect(restored.fees, original.fees);
+      expect(restored.netPnl, original.netPnl);
+      expect(restored.resultR, original.resultR);
+    });
+
     test(
       'equity, balance, win rate, profit factor and drawdown are deterministic',
       () {
@@ -203,6 +249,52 @@ void main() {
         expect(result.worstDay?.netPnl, closeTo(-20, 0.0001));
       },
     );
+
+    test('profit factor handles no trades and no losses explicitly', () {
+      final PerformanceSnapshot empty = JournalPerformanceEngine.performance(
+        const <TradeJournalEntry>[],
+        const JournalSettings(startingBalance: 100),
+        const JournalFilter(),
+        now: DateTime(2026, 8, 27),
+      );
+      final PerformanceSnapshot winsOnly = JournalPerformanceEngine.performance(
+        <TradeJournalEntry>[_trade(id: 'only-win', exit: 102)],
+        const JournalSettings(startingBalance: 100),
+        const JournalFilter(),
+        now: DateTime(2026, 8, 28),
+      );
+
+      expect(empty.profitFactor, 0);
+      expect(empty.winRate, 0);
+      expect(winsOnly.profitFactor, double.infinity);
+      expect(winsOnly.winRate, 100);
+    });
+
+    test('equity curve follows exit chronology when entries overlap', () {
+      final TradeJournalEntry openedFirst = _trade(
+        id: 'opened-first-closed-last',
+        exit: 102,
+        time: DateTime(2026, 8, 27, 9),
+        exitTime: DateTime(2026, 8, 27, 15),
+      );
+      final TradeJournalEntry openedLast = _trade(
+        id: 'opened-last-closed-first',
+        exit: 98,
+        time: DateTime(2026, 8, 27, 10),
+        exitTime: DateTime(2026, 8, 27, 12),
+      );
+
+      final PerformanceSnapshot result = JournalPerformanceEngine.performance(
+        <TradeJournalEntry>[openedFirst, openedLast],
+        const JournalSettings(startingBalance: 100),
+        const JournalFilter(),
+        now: DateTime(2026, 8, 27, 20),
+      );
+
+      expect(result.equity[1].tradeId, 'opened-last-closed-first');
+      expect(result.equity[2].tradeId, 'opened-first-closed-last');
+      expect(result.maxDrawdown, 20);
+    });
 
     test(
       'strategy, asset, LONG/SHORT and source statistics use journal records',
@@ -270,6 +362,7 @@ TradeJournalEntry _trade({
   double tp1 = 102,
   double tp2 = 103,
   double? exit,
+  DateTime? exitTime,
   double fees = 0,
   TradeContextSnapshot context = const TradeContextSnapshot(),
 }) {
@@ -287,7 +380,9 @@ TradeJournalEntry _trade({
     tp2: tp2,
     actualEntry: entry,
     actualExit: exit,
-    exitTime: exit == null ? null : tradeTime.add(const Duration(hours: 1)),
+    exitTime: exit == null
+        ? null
+        : exitTime ?? tradeTime.add(const Duration(hours: 1)),
     positionSize: 1000,
     margin: 100,
     leverage: 10,

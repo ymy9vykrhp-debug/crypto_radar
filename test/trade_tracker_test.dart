@@ -81,6 +81,30 @@ void main() {
 
     expect(restored.reasonCodes, <String>['BOS_CONFIRMED', 'RVOL_HIGH']);
   });
+
+  test('MFE and MAE only advance with newly consumed closed candles', () {
+    RadarSignal signal = _signal(start);
+    signal = tracker.consume(
+      signal,
+      _candle(start.add(const Duration(minutes: 5)), 99.0, 102.0),
+    );
+    final double mfeAfterEntry = signal.mfeR;
+    final double maeAfterEntry = signal.maeR;
+
+    signal = tracker.consume(
+      signal,
+      _candle(start.add(const Duration(minutes: 5)), 50.0, 150.0),
+    );
+    expect(signal.mfeR, mfeAfterEntry);
+    expect(signal.maeR, maeAfterEntry);
+
+    signal = tracker.consume(
+      signal,
+      _candle(start.add(const Duration(minutes: 10)), 98.0, 106.0),
+    );
+    expect(signal.mfeR, closeTo(1.2, 0.0001));
+    expect(signal.maeR, closeTo(0.4, 0.0001));
+  });
 }
 
 RadarSignal _signal(DateTime time, {SignalStyle style = SignalStyle.standard}) {

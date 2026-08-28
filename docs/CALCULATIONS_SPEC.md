@@ -272,6 +272,19 @@ The final recommended leverage is the minimum of:
 
 Never move the structural Stop closer to obtain a higher leverage.
 
+An explicit personal high-risk override may select a leverage above the safe
+recommendation only when all of the following are true:
+
+- the user has enabled the override and accepted the warning;
+- selected leverage does not exceed the leverage allowed by maximum loss;
+- selected leverage does not exceed the exchange maximum;
+- selected leverage does not exceed the personal/product hard cap of 10x.
+
+The UI must call this a personal selection, not a safe recommendation. It must
+continue to show the lower `safeLeverage` and the approximate liquidation
+buffer. The override never permits risk above 20%, never moves structural Stop,
+and does not enable live execution.
+
 ## 11. Journal aggregates
 
 Use only closed trades for realized performance:

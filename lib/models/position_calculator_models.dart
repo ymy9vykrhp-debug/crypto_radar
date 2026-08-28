@@ -29,6 +29,7 @@ class FeeModel {
     this.entryOrderType = FeeOrderType.taker,
     this.targetExitOrderType = FeeOrderType.taker,
     this.stopOrderType = FeeOrderType.taker,
+    this.entrySlippagePercent = 0.015,
     this.targetSlippagePercent = 0.015,
     this.stopSlippagePercent = 0.040,
     this.estimatedSpreadPercent = 0.020,
@@ -40,6 +41,7 @@ class FeeModel {
   final FeeOrderType entryOrderType;
   final FeeOrderType targetExitOrderType;
   final FeeOrderType stopOrderType;
+  final double entrySlippagePercent;
   final double targetSlippagePercent;
   final double stopSlippagePercent;
   final double estimatedSpreadPercent;
@@ -54,6 +56,7 @@ class FeeModel {
     FeeOrderType? entryOrderType,
     FeeOrderType? targetExitOrderType,
     FeeOrderType? stopOrderType,
+    double? entrySlippagePercent,
     double? targetSlippagePercent,
     double? stopSlippagePercent,
     double? estimatedSpreadPercent,
@@ -65,6 +68,7 @@ class FeeModel {
       entryOrderType: entryOrderType ?? this.entryOrderType,
       targetExitOrderType: targetExitOrderType ?? this.targetExitOrderType,
       stopOrderType: stopOrderType ?? this.stopOrderType,
+      entrySlippagePercent: entrySlippagePercent ?? this.entrySlippagePercent,
       targetSlippagePercent:
           targetSlippagePercent ?? this.targetSlippagePercent,
       stopSlippagePercent: stopSlippagePercent ?? this.stopSlippagePercent,
@@ -80,6 +84,7 @@ class FeeModel {
     'entryOrderType': entryOrderType.name,
     'targetExitOrderType': targetExitOrderType.name,
     'stopOrderType': stopOrderType.name,
+    'entrySlippagePercent': entrySlippagePercent,
     'targetSlippagePercent': targetSlippagePercent,
     'stopSlippagePercent': stopSlippagePercent,
     'estimatedSpreadPercent': estimatedSpreadPercent,
@@ -106,6 +111,10 @@ class FeeModel {
         defaults.targetExitOrderType,
       ),
       stopOrderType: _orderType(json['stopOrderType'], defaults.stopOrderType),
+      entrySlippagePercent: _safePercent(
+        json['entrySlippagePercent'],
+        defaults.entrySlippagePercent,
+      ),
       targetSlippagePercent: _safePercent(
         json['targetSlippagePercent'],
         defaults.targetSlippagePercent,
@@ -131,6 +140,37 @@ enum AssetRiskClass { major, standard, speculative }
 enum TradeSafetyStatus { acceptable, wait, lowEdge, skip, blocked }
 
 enum TargetVerdict { worthIt, lowEdge, skip }
+
+enum ExecutionPriceMode { plannedLimit, market }
+
+enum TradeValidationCode {
+  invalidNumber,
+  invalidMargin,
+  invalidRisk,
+  invalidEntryOrStop,
+  zeroStopDistance,
+  invalidStopDirection,
+  invalidTarget,
+  invalidTargetDirection,
+  invalidTargetMove,
+  invalidCosts,
+  missingTickSize,
+  missingQuantityStep,
+  invalidMarketQuote,
+  leverageBelowOne,
+  quantityRoundsToZero,
+  belowMinimumQuantity,
+  belowMinimumNotional,
+  riskLimitExceeded,
+  invalidTargetAllocations,
+}
+
+class TradeValidationIssue {
+  const TradeValidationIssue({required this.code, required this.message});
+
+  final TradeValidationCode code;
+  final String message;
+}
 
 class SmartPositionInput {
   const SmartPositionInput({
@@ -163,6 +203,12 @@ class SmartPositionInput {
     this.minNotional = 0.0,
     this.tickSize = 0.0,
     this.observedSpreadPercent = 0.0,
+    this.bidPrice = 0.0,
+    this.askPrice = 0.0,
+    this.executionPriceMode = ExecutionPriceMode.plannedLimit,
+    this.targetAllocations = const <double>[],
+    this.personalMaxLeverage = 10,
+    this.highRiskLeverageEnabled = false,
   });
 
   factory SmartPositionInput.fromDecision({
@@ -212,6 +258,8 @@ class SmartPositionInput {
       minNotional: minNotional,
       tickSize: tickSize,
       observedSpreadPercent: market.ticker.spreadPercent,
+      bidPrice: market.ticker.bidPrice,
+      askPrice: market.ticker.askPrice,
       assetRiskClass: _classifyAsset(market.symbol),
       hasSharpImpulse: decision.expectedMovePercent >= 4.0 || atrPercent >= 2.0,
       isChaos: effectiveVolatility >= 30.0 || atrPercent >= 3.0,
@@ -247,6 +295,12 @@ class SmartPositionInput {
   final double minNotional;
   final double tickSize;
   final double observedSpreadPercent;
+  final double bidPrice;
+  final double askPrice;
+  final ExecutionPriceMode executionPriceMode;
+  final List<double> targetAllocations;
+  final int personalMaxLeverage;
+  final bool highRiskLeverageEnabled;
 
   double get atrPercent => entry <= 0 ? 0 : atr / entry * 100.0;
 
@@ -266,6 +320,12 @@ class SmartPositionInput {
     double? minNotional,
     double? tickSize,
     double? observedSpreadPercent,
+    double? bidPrice,
+    double? askPrice,
+    ExecutionPriceMode? executionPriceMode,
+    List<double>? targetAllocations,
+    int? personalMaxLeverage,
+    bool? highRiskLeverageEnabled,
   }) {
     return SmartPositionInput(
       symbol: symbol,
@@ -298,6 +358,13 @@ class SmartPositionInput {
       tickSize: tickSize ?? this.tickSize,
       observedSpreadPercent:
           observedSpreadPercent ?? this.observedSpreadPercent,
+      bidPrice: bidPrice ?? this.bidPrice,
+      askPrice: askPrice ?? this.askPrice,
+      executionPriceMode: executionPriceMode ?? this.executionPriceMode,
+      targetAllocations: targetAllocations ?? this.targetAllocations,
+      personalMaxLeverage: personalMaxLeverage ?? this.personalMaxLeverage,
+      highRiskLeverageEnabled:
+          highRiskLeverageEnabled ?? this.highRiskLeverageEnabled,
     );
   }
 }
@@ -318,6 +385,7 @@ class CostBreakdown {
   final double safetyBuffer;
 
   double get fees => entryFee + exitFee;
+  double get cashCharges => fees + safetyBuffer;
   double get total => fees + spread + slippage + safetyBuffer;
 }
 
@@ -326,20 +394,27 @@ class StopOutcome {
     required this.distancePercent,
     required this.movementLoss,
     required this.costs,
+    required this.price,
+    required this.effectivePrice,
   });
 
   final double distancePercent;
   final double movementLoss;
   final CostBreakdown costs;
+  final double price;
+  final double effectivePrice;
 
-  double get expectedLoss => movementLoss + costs.total;
+  double get expectedLoss => movementLoss + costs.cashCharges;
 }
 
 class TargetOutcome {
   const TargetOutcome({
     required this.label,
     required this.price,
+    required this.effectivePrice,
+    required this.allocationFraction,
     required this.movePercent,
+    required this.idealGrossProfit,
     required this.grossProfit,
     required this.costs,
     required this.netProfit,
@@ -351,7 +426,10 @@ class TargetOutcome {
 
   final String label;
   final double price;
+  final double effectivePrice;
+  final double allocationFraction;
   final double movePercent;
+  final double idealGrossProfit;
   final double grossProfit;
   final CostBreakdown costs;
   final double netProfit;
@@ -369,6 +447,8 @@ class LeverageSafetyResult {
     required this.aggressiveLeverage,
     required this.dangerousFromLeverage,
     required this.recommendedLeverage,
+    required this.personalMaxLeverage,
+    required this.highRiskOverrideApplied,
     required this.estimatedLiquidationDistancePercent,
     required this.reasons,
   });
@@ -379,6 +459,8 @@ class LeverageSafetyResult {
   final int aggressiveLeverage;
   final int dangerousFromLeverage;
   final int recommendedLeverage;
+  final int personalMaxLeverage;
+  final bool highRiskOverrideApplied;
   final double estimatedLiquidationDistancePercent;
   final List<String> reasons;
 }
@@ -387,7 +469,9 @@ class SmartTradePlan {
   const SmartTradePlan({
     required this.symbol,
     required this.side,
+    required this.allocatedMargin,
     required this.entry,
+    required this.effectiveEntry,
     required this.stop,
     required this.targets,
     required this.margin,
@@ -399,6 +483,9 @@ class SmartTradePlan {
     required this.estimatedSlippage,
     required this.rawRiskReward,
     required this.netRiskReward,
+    required this.weightedRawResultR,
+    required this.weightedNetResultR,
+    required this.partialNetProfit,
     required this.confidence,
     required this.setupType,
     required this.safetyStatus,
@@ -407,13 +494,16 @@ class SmartTradePlan {
     required this.targetMoveOutcome,
     required this.explanation,
     required this.reasons,
+    required this.validationIssues,
     required this.maxNotionalByRisk,
     required this.effectiveLossPercent,
   });
 
   final String symbol;
   final SignalDirection side;
+  final double allocatedMargin;
   final double entry;
+  final double effectiveEntry;
   final double stop;
   final List<TargetOutcome> targets;
   final double margin;
@@ -425,6 +515,9 @@ class SmartTradePlan {
   final double estimatedSlippage;
   final double rawRiskReward;
   final double netRiskReward;
+  final double weightedRawResultR;
+  final double weightedNetResultR;
+  final double partialNetProfit;
   final int confidence;
   final String setupType;
   final TradeSafetyStatus safetyStatus;
@@ -433,10 +526,12 @@ class SmartTradePlan {
   final TargetOutcome targetMoveOutcome;
   final List<String> explanation;
   final List<String> reasons;
+  final List<TradeValidationIssue> validationIssues;
   final double maxNotionalByRisk;
   final double effectiveLossPercent;
 
   bool get isBlocked => safetyStatus == TradeSafetyStatus.blocked;
+  bool get isValid => validationIssues.isEmpty;
 }
 
 AssetRiskClass _classifyAsset(String symbol) {

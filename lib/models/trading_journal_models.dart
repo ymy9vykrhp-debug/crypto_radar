@@ -1,3 +1,5 @@
+import '../utils/exchange_decimal.dart';
+
 enum TradeSource { manual, paper, bybitDemo, live }
 
 enum JournalTradeSide { long, short }
@@ -77,7 +79,7 @@ class TradeContextSnapshot {
     'strategyVersion': strategyVersion,
     'signalEngineVersion': signalEngineVersion,
     'dataEngineVersion': dataEngineVersion,
-    'riskPercent': riskPercent,
+    'riskPercent': ExchangeDecimal.canonical(riskPercent),
     'radarSignalId': radarSignalId,
     'radarDecision': radarDecision,
     'setupStage': setupStage,
@@ -385,18 +387,18 @@ class TradeJournalEntry {
     'tradeTime': tradeTime.toIso8601String(),
     'symbol': symbol,
     'side': side.name,
-    'plannedEntry': plannedEntry,
-    'stopLoss': stopLoss,
-    'tp1': tp1,
-    'tp2': tp2,
-    'tp3': tp3,
-    'actualEntry': actualEntry,
-    'actualExit': actualExit,
+    'plannedEntry': ExchangeDecimal.canonical(plannedEntry),
+    'stopLoss': ExchangeDecimal.canonical(stopLoss),
+    'tp1': ExchangeDecimal.canonical(tp1),
+    'tp2': ExchangeDecimal.canonical(tp2),
+    'tp3': ExchangeDecimal.canonicalNullable(tp3),
+    'actualEntry': ExchangeDecimal.canonical(actualEntry),
+    'actualExit': ExchangeDecimal.canonicalNullable(actualExit),
     'exitTime': exitTime?.toIso8601String(),
-    'positionSize': positionSize,
-    'margin': margin,
-    'leverage': leverage,
-    'fees': fees,
+    'positionSize': ExchangeDecimal.canonical(positionSize),
+    'margin': ExchangeDecimal.canonical(margin),
+    'leverage': ExchangeDecimal.canonical(leverage),
+    'fees': ExchangeDecimal.canonical(fees),
     'strategy': strategy,
     'timeframe': timeframe,
     'status': status.name,
@@ -409,8 +411,8 @@ class TradeJournalEntry {
     'whatShouldChange': whatShouldChange,
     'useForStrategyResearch': useForStrategyResearch,
     'contextSnapshot': contextSnapshot.toJson(),
-    'mfeR': mfeR,
-    'maeR': maeR,
+    'mfeR': ExchangeDecimal.canonicalNullable(mfeR),
+    'maeR': ExchangeDecimal.canonicalNullable(maeR),
     'screenshotReference': screenshotReference,
     'chartSnapshotReference': chartSnapshotReference,
     'replayReference': replayReference,
@@ -588,10 +590,10 @@ class JournalSettings {
   );
 
   Map<String, Object?> toJson() => <String, Object?>{
-    'startingBalance': startingBalance,
-    'dailyMaxLoss': dailyMaxLoss,
-    'weeklyMaxLoss': weeklyMaxLoss,
-    'dailyTarget': dailyTarget,
+    'startingBalance': ExchangeDecimal.canonical(startingBalance),
+    'dailyMaxLoss': ExchangeDecimal.canonicalNullable(dailyMaxLoss),
+    'weeklyMaxLoss': ExchangeDecimal.canonicalNullable(weeklyMaxLoss),
+    'dailyTarget': ExchangeDecimal.canonicalNullable(dailyTarget),
   };
 
   factory JournalSettings.fromJson(Map<String, dynamic> json) =>

@@ -17,6 +17,8 @@ void main() {
     expect(controller.soundEnabled, isTrue);
     expect(controller.riskPreset, RiskPreset.normal);
     expect(controller.effectiveRiskPercent, 2);
+    expect(controller.personalMaxLeverage, 10);
+    expect(controller.highRiskLeverageEnabled, isTrue);
     expect(const AppStrings(AppLanguage.ru).instrument, 'Инструмент');
 
     controller.setThemeMode(ThemeMode.light);
@@ -38,8 +40,14 @@ void main() {
     );
     first.setRiskPreset(RiskPreset.custom);
     first.setCustomRiskPercent(2.5);
+    first.setPersonalMaxLeverage(9);
+    first.setHighRiskLeverageEnabled(false);
     first.setFeeModel(
-      first.feeModel.copyWith(makerFeePercent: 0.01, stopSlippagePercent: 0.08),
+      first.feeModel.copyWith(
+        makerFeePercent: 0.01,
+        entrySlippagePercent: 0.03,
+        stopSlippagePercent: 0.08,
+      ),
     );
     first.setTelegramRelayConfig(
       const TelegramRelayConfig(
@@ -56,7 +64,10 @@ void main() {
 
     expect(restored.riskPreset, RiskPreset.custom);
     expect(restored.effectiveRiskPercent, 2.5);
+    expect(restored.personalMaxLeverage, 9);
+    expect(restored.highRiskLeverageEnabled, isFalse);
     expect(restored.feeModel.makerFeePercent, 0.01);
+    expect(restored.feeModel.entrySlippagePercent, 0.03);
     expect(restored.feeModel.stopSlippagePercent, 0.08);
     expect(restored.telegramRelayConfig.enabled, isTrue);
     expect(restored.telegramRelayConfig.baseUrl, 'http://127.0.0.1:9999');

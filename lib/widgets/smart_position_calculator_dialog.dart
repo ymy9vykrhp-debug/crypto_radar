@@ -87,6 +87,8 @@ class _SmartPositionCalculatorDialogState
       tp3: tp3,
       clearTp3: tp3 == null,
       targetMovePercent: _parse(_targetMove.text),
+      personalMaxLeverage: widget.preferences.personalMaxLeverage,
+      highRiskLeverageEnabled: widget.preferences.highRiskLeverageEnabled,
     );
   }
 
@@ -263,6 +265,14 @@ class _SmartPositionCalculatorDialogState
               suffix: '%',
               onChanged: _recalculate,
             ),
+            const SizedBox(height: 4),
+            Text(
+              strings.pick(
+                'Допустимый диапазон: 0.1–20%. Повышенный риск увеличивает возможный убыток.',
+                'Allowed range: 0.1–20%. Higher risk increases the possible loss.',
+              ),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           ],
           const SizedBox(height: 8),
           _InfoLine(
@@ -341,7 +351,12 @@ class _SmartPositionCalculatorDialogState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           Text(
-            strings.pick('РЕКОМЕНДУЕМОЕ ПЛЕЧО', 'RECOMMENDED LEVERAGE'),
+            plan.leverageSafety.highRiskOverrideApplied
+                ? strings.pick(
+                    'ЛИЧНО ВЫБРАННОЕ ПЛЕЧО',
+                    'PERSONALLY SELECTED LEVERAGE',
+                  )
+                : strings.pick('РЕКОМЕНДУЕМОЕ ПЛЕЧО', 'RECOMMENDED LEVERAGE'),
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.labelLarge,
           ),
@@ -372,8 +387,12 @@ class _SmartPositionCalculatorDialogState
               const SizedBox(width: 6),
               Expanded(
                 child: _LeverageTile(
-                  label: '🔴 BLOCKED',
-                  value: '${plan.leverageSafety.dangerousFromLeverage}x+',
+                  label: plan.leverageSafety.highRiskOverrideApplied
+                      ? '⚠️ PERSONAL'
+                      : '🔴 BLOCKED',
+                  value: plan.leverageSafety.highRiskOverrideApplied
+                      ? '${plan.leverageSafety.personalMaxLeverage}x MAX'
+                      : '${plan.leverageSafety.dangerousFromLeverage}x+',
                 ),
               ),
             ],
@@ -387,6 +406,32 @@ class _SmartPositionCalculatorDialogState
           _InfoLine(
             label: 'Safety limit',
             value: '${plan.leverageSafety.safetyLimit}x',
+          ),
+          if (plan.leverageSafety.highRiskOverrideApplied)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                strings.pick(
+                  '⚠️ Личный режим риска включён: выбранное плечо выше безопасной рекомендации. Реальный ордер не отправляется.',
+                  '⚠️ Personal risk mode is enabled: selected leverage is above the safe recommendation. No real order is sent.',
+                ),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          _InfoLine(
+            label: strings.pick('Выделенная маржа', 'Allocated margin'),
+            value: _money(plan.allocatedMargin),
+          ),
+          _InfoLine(
+            label: strings.pick('Используемая маржа', 'Used margin'),
+            value: _money(plan.margin),
+          ),
+          _InfoLine(
+            label: strings.pick('Цена исполнения Entry', 'Effective Entry'),
+            value: _price(plan.effectiveEntry),
           ),
           _InfoLine(
             label: strings.pick('Размер позиции', 'Position notional'),
@@ -421,6 +466,10 @@ class _SmartPositionCalculatorDialogState
           _InfoLine(
             label: strings.pick('Движение цены', 'Price move'),
             value: '-${stop.distancePercent.toStringAsFixed(3)}%',
+          ),
+          _InfoLine(
+            label: strings.pick('Исполнение Stop', 'Effective Stop'),
+            value: _price(stop.effectivePrice),
           ),
           _InfoLine(
             label: strings.pick('Убыток от движения', 'Movement loss'),
@@ -478,6 +527,29 @@ class _SmartPositionCalculatorDialogState
             label: 'Net R:R after costs · TP2',
             value: '1:${plan.netRiskReward.toStringAsFixed(2)}',
             emphasized: true,
+          ),
+          const Divider(height: 16),
+          _InfoLine(
+            label: strings.pick(
+              'План частичных выходов · Raw Result R',
+              'Partial exit plan · Raw Result R',
+            ),
+            value: '${plan.weightedRawResultR.toStringAsFixed(2)}R',
+          ),
+          _InfoLine(
+            label: strings.pick(
+              'План частичных выходов · Net Result R',
+              'Partial exit plan · Net Result R',
+            ),
+            value: '${plan.weightedNetResultR.toStringAsFixed(2)}R',
+            emphasized: true,
+          ),
+          _InfoLine(
+            label: strings.pick(
+              'Ожидаемая чистая прибыль частями',
+              'Expected partial net profit',
+            ),
+            value: _money(plan.partialNetProfit),
           ),
         ],
       ),
@@ -764,7 +836,8 @@ class _TargetTile extends StatelessWidget {
               children: <Widget>[
                 Expanded(
                   child: Text(
-                    '${target.label} · ${_price(target.price)}',
+                    '${target.label} · ${_price(target.price)} · '
+                    '${(target.allocationFraction * 100).toStringAsFixed(0)}%',
                     style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
                 ),
@@ -779,8 +852,22 @@ class _TargetTile extends StatelessWidget {
               label: 'Move',
               value: '${target.movePercent.toStringAsFixed(3)}%',
             ),
-            _InfoLine(label: 'Gross', value: _money(target.grossProfit)),
-            _InfoLine(label: 'Costs', value: '-${_money(target.costs.total)}'),
+            _InfoLine(
+              label: 'Ideal gross',
+              value: _money(target.idealGrossProfit),
+            ),
+            _InfoLine(
+              label: 'Gross after execution',
+              value: _money(target.grossProfit),
+            ),
+            _InfoLine(
+              label: 'Entry + exit fees',
+              value: '-${_money(target.costs.fees)}',
+            ),
+            _InfoLine(
+              label: 'Spread + Slippage impact',
+              value: '-${_money(target.costs.spread + target.costs.slippage)}',
+            ),
             _InfoLine(
               label: 'Net',
               value: _money(target.netProfit),

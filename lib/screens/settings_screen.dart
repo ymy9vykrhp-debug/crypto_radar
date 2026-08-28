@@ -274,6 +274,56 @@ class _TradingRiskSettings extends StatelessWidget {
           ),
           style: Theme.of(context).textTheme.bodySmall,
         ),
+        const SizedBox(height: 12),
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          value: preferences.highRiskLeverageEnabled,
+          onChanged: preferences.setHighRiskLeverageEnabled,
+          title: Text(
+            strings.pick(
+              'Личный high-risk режим плеча',
+              'Personal high-risk leverage mode',
+            ),
+          ),
+          subtitle: Text(
+            strings.pick(
+              'Разрешает расчёт выше Safety limit, но только в пределах риска, биржевого лимита и 10x.',
+              'Allows calculation above the Safety limit, but only within the risk limit, exchange limit, and 10x.',
+            ),
+          ),
+        ),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                strings.pick(
+                  'Личный максимум плеча',
+                  'Personal maximum leverage',
+                ),
+              ),
+            ),
+            DropdownButton<int>(
+              value: preferences.personalMaxLeverage,
+              items: List<DropdownMenuItem<int>>.generate(
+                10,
+                (int index) => DropdownMenuItem<int>(
+                  value: index + 1,
+                  child: Text('${index + 1}x'),
+                ),
+              ),
+              onChanged: (int? value) {
+                if (value != null) preferences.setPersonalMaxLeverage(value);
+              },
+            ),
+          ],
+        ),
+        Text(
+          strings.pick(
+            'Максимальный пользовательский риск — 20%. Это не гарантия безопасности; при нарушении расчётного лимита сделка всё равно блокируется.',
+            'Maximum custom risk is 20%. This is not a safety guarantee; the trade is still blocked if the calculated risk limit is exceeded.',
+          ),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
         const Divider(height: 28),
         Text(
           'Fee Model · USDT Perpetual',
@@ -310,6 +360,13 @@ class _TradingRiskSettings extends StatelessWidget {
               value: fee.estimatedSpreadPercent,
               onSubmitted: (double value) => preferences.setFeeModel(
                 fee.copyWith(estimatedSpreadPercent: value),
+              ),
+            ),
+            _PercentSettingField(
+              label: 'Entry slippage',
+              value: fee.entrySlippagePercent,
+              onSubmitted: (double value) => preferences.setFeeModel(
+                fee.copyWith(entrySlippagePercent: value),
               ),
             ),
             _PercentSettingField(

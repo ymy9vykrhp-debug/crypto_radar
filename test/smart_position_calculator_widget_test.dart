@@ -86,6 +86,10 @@ SmartPositionInput _input() => const SmartPositionInput(
   allocatedMargin: 100,
   riskPercent: 3,
   assetRiskClass: AssetRiskClass.major,
+  quantityStep: 0.001,
+  minOrderQuantity: 0.001,
+  minNotional: 5,
+  tickSize: 0.01,
 );
 
 class _MemoryStorage implements LocalStorageBackend {

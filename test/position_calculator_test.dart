@@ -11,13 +11,17 @@ void main() {
       final SmartTradePlan plan = _calculate(_input());
 
       expect(plan.side, SignalDirection.long);
-      expect(plan.margin, 100);
+      expect(plan.allocatedMargin, 100);
+      expect(plan.margin, lessThanOrEqualTo(plan.allocatedMargin));
       expect(plan.maxLoss, 3);
       expect(plan.leverage, greaterThanOrEqualTo(1));
       expect(plan.leverage, lessThanOrEqualTo(10));
       expect(plan.positionNotional, closeTo(plan.margin * plan.leverage, 1e-8));
       expect(plan.stopOutcome.expectedLoss, lessThanOrEqualTo(3.01));
-      expect(plan.quantity, closeTo(plan.positionNotional / plan.entry, 1e-8));
+      expect(
+        plan.quantity,
+        closeTo(plan.positionNotional / plan.effectiveEntry, 1e-8),
+      );
       expect(plan.netRiskReward, lessThan(plan.rawRiskReward));
     });
 
@@ -137,18 +141,21 @@ void main() {
       );
     });
 
-    test('observed public spread overrides the configured estimate', () {
-      final SmartTradePlan estimated = _calculate(_input());
-      final SmartTradePlan observed = _calculate(
-        _input().copyWith(observedSpreadPercent: 0.25),
+    test('spread changes execution only for an explicit market entry', () {
+      final SmartTradePlan planned = _calculate(_input());
+      final SmartTradePlan market = _calculate(
+        _input().copyWith(
+          executionPriceMode: ExecutionPriceMode.market,
+          bidPrice: 99.9,
+          askPrice: 100.1,
+          observedSpreadPercent: 0.20,
+        ),
       );
 
-      expect(
-        observed.effectiveLossPercent,
-        greaterThan(estimated.effectiveLossPercent),
-      );
-      expect(observed.maxNotionalByRisk, lessThan(estimated.maxNotionalByRisk));
-      expect(observed.leverage, lessThanOrEqualTo(estimated.leverage));
+      expect(planned.effectiveEntry, lessThan(market.effectiveEntry));
+      expect(market.stopOutcome.costs.spread, greaterThan(0));
+      expect(market.maxNotionalByRisk, lessThan(planned.maxNotionalByRisk));
+      expect(market.leverage, lessThanOrEqualTo(planned.leverage));
     });
 
     test('invalid LONG structural stop is blocked instead of moved', () {
@@ -173,6 +180,247 @@ void main() {
       expect(plan.safetyStatus, TradeSafetyStatus.wait);
       expect(plan.leverage, greaterThan(0));
       expect(plan.positionNotional, greaterThan(0));
+    });
+
+    test('entry and exit fees use their own notionals and order types', () {
+      const FeeModel fees = FeeModel(
+        makerFeePercent: 0.02,
+        takerFeePercent: 0.06,
+        entryOrderType: FeeOrderType.maker,
+        targetExitOrderType: FeeOrderType.taker,
+        stopOrderType: FeeOrderType.taker,
+        entrySlippagePercent: 0,
+        targetSlippagePercent: 0,
+        stopSlippagePercent: 0,
+        estimatedSpreadPercent: 0,
+        safetyBufferPercent: 0,
+      );
+      final SmartTradePlan plan = PositionCalculator.calculate(
+        input: _input(),
+        feeModel: fees,
+      );
+      final TargetOutcome target = plan.targets.first;
+
+      expect(
+        target.costs.entryFee,
+        closeTo(plan.quantity * plan.effectiveEntry * 0.0002, 1e-10),
+      );
+      expect(
+        target.costs.exitFee,
+        closeTo(plan.quantity * target.effectivePrice * 0.0006, 1e-10),
+      );
+      expect(target.costs.entryFee, isNot(target.costs.exitFee));
+    });
+
+    test('slippage changes execution prices in the adverse direction', () {
+      const FeeModel slippage = FeeModel(
+        makerFeePercent: 0,
+        takerFeePercent: 0,
+        entrySlippagePercent: 0.1,
+        targetSlippagePercent: 0.1,
+        stopSlippagePercent: 0.1,
+        estimatedSpreadPercent: 0,
+        safetyBufferPercent: 0,
+      );
+      final SmartTradePlan longPlan = PositionCalculator.calculate(
+        input: _input(),
+        feeModel: slippage,
+      );
+      final SmartTradePlan shortPlan = PositionCalculator.calculate(
+        input: _input(
+          direction: SignalDirection.short,
+          decisionAction: DecisionAction.short,
+          stop: 100.65,
+          tp1: 99,
+          tp2: 98,
+          regime: MarketRegimeHint.trendDown,
+        ),
+        feeModel: slippage,
+      );
+
+      expect(longPlan.effectiveEntry, greaterThan(longPlan.entry));
+      expect(
+        longPlan.targets.first.effectivePrice,
+        lessThan(longPlan.targets.first.price),
+      );
+      expect(shortPlan.effectiveEntry, lessThan(shortPlan.entry));
+      expect(
+        shortPlan.targets.first.effectivePrice,
+        greaterThan(shortPlan.targets.first.price),
+      );
+    });
+
+    test('stop and targets round conservatively by tick size', () {
+      final SmartTradePlan longPlan = _calculate(
+        _input(stop: 99.357, tp1: 101.237, tp2: 102.519),
+      );
+      final SmartTradePlan shortPlan = _calculate(
+        _input(
+          direction: SignalDirection.short,
+          decisionAction: DecisionAction.short,
+          stop: 100.653,
+          tp1: 99.347,
+          tp2: 98.331,
+          regime: MarketRegimeHint.trendDown,
+        ),
+      );
+
+      expect(longPlan.stop, 99.35);
+      expect(longPlan.targets.first.price, 101.23);
+      expect(shortPlan.stop, 100.66);
+      expect(shortPlan.targets.first.price, 99.35);
+    });
+
+    test('target crossing Entry after tick rounding is blocked explicitly', () {
+      final SmartTradePlan plan = _calculate(
+        _input(tp1: 100.004, tp2: 100.006),
+      );
+
+      expect(
+        plan.validationIssues.map((TradeValidationIssue issue) => issue.code),
+        contains(TradeValidationCode.invalidTargetDirection),
+      );
+      expect(plan.safetyStatus, TradeSafetyStatus.blocked);
+    });
+
+    test('missing exchange rules block the trade with typed errors', () {
+      final SmartTradePlan plan = _calculate(
+        _input().copyWith(tickSize: 0, quantityStep: 0),
+      );
+
+      expect(plan.isValid, isFalse);
+      expect(
+        plan.validationIssues.map((TradeValidationIssue issue) => issue.code),
+        containsAll(<TradeValidationCode>[
+          TradeValidationCode.missingTickSize,
+          TradeValidationCode.missingQuantityStep,
+        ]),
+      );
+    });
+
+    test('quantity that floors to zero is blocked explicitly', () {
+      final SmartTradePlan plan = _calculate(
+        _input().copyWith(
+          allocatedMargin: 1,
+          quantityStep: 1,
+          minOrderQuantity: 1,
+        ),
+      );
+
+      expect(plan.quantity, 0);
+      expect(
+        plan.validationIssues.map((TradeValidationIssue issue) => issue.code),
+        contains(TradeValidationCode.quantityRoundsToZero),
+      );
+      expect(plan.safetyStatus, TradeSafetyStatus.blocked);
+    });
+
+    test('tiny prices stay finite and respect tick and quantity steps', () {
+      final SmartTradePlan plan = _calculate(
+        _input(
+          entry: 0.00000012,
+          stop: 0.00000011,
+          tp1: 0.00000013,
+          tp2: 0.00000015,
+        ).copyWith(
+          tickSize: 0.00000001,
+          quantityStep: 1,
+          minOrderQuantity: 1,
+          minNotional: 1,
+        ),
+      );
+
+      expect(plan.stop, 0.00000011);
+      expect(plan.quantity.isFinite, isTrue);
+      expect(plan.positionNotional.isFinite, isTrue);
+      expect(plan.quantity, plan.quantity.floorToDouble());
+    });
+
+    test('partial TP allocation produces weighted raw and net Result R', () {
+      final SmartTradePlan plan = _calculate(_input().copyWith(tp3: 104));
+
+      expect(
+        plan.targets.map((TargetOutcome target) => target.allocationFraction),
+        <double>[0.5, 0.3, 0.2],
+      );
+      final double expectedRaw = plan.targets.fold<double>(
+        0,
+        (double total, TargetOutcome target) =>
+            total + target.rawRiskReward * target.allocationFraction,
+      );
+      expect(plan.weightedRawResultR, closeTo(expectedRaw, 1e-12));
+      expect(
+        plan.weightedNetResultR,
+        closeTo(plan.partialNetProfit / plan.stopOutcome.expectedLoss, 1e-12),
+      );
+    });
+
+    test('invalid partial TP allocation is a typed blocking error', () {
+      final SmartTradePlan plan = _calculate(
+        _input().copyWith(tp3: 104, targetAllocations: <double>[0.8, 0.4, 0.2]),
+      );
+
+      expect(
+        plan.validationIssues.map((TradeValidationIssue issue) => issue.code),
+        contains(TradeValidationCode.invalidTargetAllocations),
+      );
+      expect(plan.safetyStatus, TradeSafetyStatus.blocked);
+    });
+
+    test('personal risk mode permits up to 10x without exceeding 20% risk', () {
+      final SmartTradePlan plan = _calculate(
+        _input(volatilityPercent: 25).copyWith(
+          riskPercent: 20,
+          personalMaxLeverage: 10,
+          highRiskLeverageEnabled: true,
+        ),
+      );
+
+      expect(plan.maxLoss, 20);
+      expect(plan.leverageSafety.safeLeverage, lessThan(10));
+      expect(plan.leverageSafety.highRiskOverrideApplied, isTrue);
+      expect(plan.leverage, 10);
+      expect(plan.stopOutcome.expectedLoss, lessThanOrEqualTo(20.01));
+    });
+
+    test('risk above 20 percent remains blocked', () {
+      final SmartTradePlan plan = _calculate(
+        _input().copyWith(
+          riskPercent: 20.1,
+          personalMaxLeverage: 10,
+          highRiskLeverageEnabled: true,
+        ),
+      );
+
+      expect(
+        plan.validationIssues.map((TradeValidationIssue issue) => issue.code),
+        contains(TradeValidationCode.invalidRisk),
+      );
+      expect(plan.safetyStatus, TradeSafetyStatus.blocked);
+    });
+
+    test('high price calculations remain finite', () {
+      final SmartTradePlan plan = _calculate(
+        _input(
+          entry: 1000000000,
+          stop: 999000000,
+          tp1: 1002000000,
+          tp2: 1005000000,
+        ).copyWith(
+          tickSize: 0.1,
+          quantityStep: 0.00000001,
+          minOrderQuantity: 0.00000001,
+          minNotional: 5,
+        ),
+      );
+
+      expect(plan.quantity.isFinite, isTrue);
+      expect(plan.positionNotional.isFinite, isTrue);
+      expect(plan.stopOutcome.expectedLoss.isFinite, isTrue);
+      expect(
+        plan.targets.every((TargetOutcome target) => target.netProfit.isFinite),
+        isTrue,
+      );
     });
   });
 }
@@ -214,5 +462,9 @@ SmartPositionInput _input({
     targetMovePercent: targetMovePercent,
     exchangeMaxLeverage: 10,
     assetRiskClass: AssetRiskClass.major,
+    quantityStep: 0.001,
+    minOrderQuantity: 0.001,
+    minNotional: 5,
+    tickSize: 0.01,
   );
 }

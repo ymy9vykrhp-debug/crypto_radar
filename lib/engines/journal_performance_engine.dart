@@ -422,7 +422,7 @@ class JournalPerformanceEngine {
         continue;
       }
       byDay
-          .putIfAbsent(dateKey(trade.tradeTime), () => <TradeJournalEntry>[])
+          .putIfAbsent(dateKey(_resultTime(trade)), () => <TradeJournalEntry>[])
           .add(trade);
     }
     final List<DailyJournalSummary> result =
@@ -498,7 +498,7 @@ class JournalPerformanceEngine {
       for (final TradeJournalEntry trade in source.where(
         (TradeJournalEntry trade) => trade.isClosed,
       )) {
-        final String key = dateKey(trade.tradeTime);
+        final String key = dateKey(_resultTime(trade));
         pnlByDay[key] = (pnlByDay[key] ?? 0.0) + trade.netPnl;
       }
       for (final double pnl in pnlByDay.values) {
@@ -630,7 +630,7 @@ class JournalPerformanceEngine {
     for (final TradeJournalEntry trade in source.where(
       (TradeJournalEntry trade) => trade.isClosed,
     )) {
-      final DateTime local = trade.tradeTime.toLocal();
+      final DateTime local = _resultTime(trade).toLocal();
       final DateTime start = weekly
           ? DateTime(
               local.year,

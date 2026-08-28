@@ -127,6 +127,24 @@ class LeverageSafety {
       reasons.add('Плечо ограничено только установленным риском сделки.');
     }
 
+    final int personalLimit = math.min(
+      10,
+      math.min(
+        input.exchangeMaxLeverage.floor(),
+        input.personalMaxLeverage.clamp(1, 10),
+      ),
+    );
+    final int personalLeverage = math.min(riskLimited, personalLimit);
+    final bool highRiskOverrideApplied =
+        input.highRiskLeverageEnabled && personalLeverage > safe;
+    final int recommended = highRiskOverrideApplied ? personalLeverage : safe;
+    if (highRiskOverrideApplied) {
+      reasons.add(
+        'Включён личный high-risk override: плечо выше Safety limit, но не выше расчётного лимита риска и 10x.',
+      );
+    }
+    liquidationDistance = _liquidationDistance(recommended);
+
     return LeverageSafetyResult(
       calculatedLeverage: calculatedLeverage.isFinite
           ? calculatedLeverage
@@ -135,7 +153,9 @@ class LeverageSafety {
       safeLeverage: safe,
       aggressiveLeverage: aggressive,
       dangerousFromLeverage: dangerousFrom,
-      recommendedLeverage: safe,
+      recommendedLeverage: recommended,
+      personalMaxLeverage: personalLimit,
+      highRiskOverrideApplied: highRiskOverrideApplied,
       estimatedLiquidationDistancePercent: liquidationDistance,
       reasons: List<String>.unmodifiable(reasons),
     );

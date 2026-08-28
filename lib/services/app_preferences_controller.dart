@@ -20,6 +20,8 @@ class AppPreferencesController extends ChangeNotifier {
   bool _soundEnabled = true;
   RiskPreset _riskPreset = RiskPreset.normal;
   double _customRiskPercent = 2.0;
+  int _personalMaxLeverage = 10;
+  bool _highRiskLeverageEnabled = true;
   FeeModel _feeModel = const FeeModel();
   TelegramRelayConfig _telegramRelayConfig = const TelegramRelayConfig();
   bool _initialized = false;
@@ -33,6 +35,8 @@ class AppPreferencesController extends ChangeNotifier {
   double get effectiveRiskPercent => _riskPreset == RiskPreset.custom
       ? _customRiskPercent
       : _riskPreset.defaultPercent;
+  int get personalMaxLeverage => _personalMaxLeverage;
+  bool get highRiskLeverageEnabled => _highRiskLeverageEnabled;
   FeeModel get feeModel => _feeModel;
   TelegramRelayConfig get telegramRelayConfig => _telegramRelayConfig;
 
@@ -69,6 +73,15 @@ class AppPreferencesController extends ChangeNotifier {
       if (parsedRisk.isFinite && parsedRisk >= 0.1 && parsedRisk <= 20.0) {
         _customRiskPercent = parsedRisk;
       }
+      final int parsedLeverage =
+          int.tryParse('${decoded['personalMaxLeverage']}') ??
+          _personalMaxLeverage;
+      if (parsedLeverage >= 1 && parsedLeverage <= 10) {
+        _personalMaxLeverage = parsedLeverage;
+      }
+      _highRiskLeverageEnabled = decoded['highRiskLeverageEnabled'] is bool
+          ? decoded['highRiskLeverageEnabled'] as bool
+          : _highRiskLeverageEnabled;
       final Object? feeJson = decoded['feeModel'];
       if (feeJson is Map<String, dynamic>) {
         _feeModel = FeeModel.fromJson(feeJson);
@@ -119,6 +132,20 @@ class AppPreferencesController extends ChangeNotifier {
     _scheduleSave();
   }
 
+  void setPersonalMaxLeverage(int value) {
+    if (value < 1 || value > 10 || _personalMaxLeverage == value) return;
+    _personalMaxLeverage = value;
+    notifyListeners();
+    _scheduleSave();
+  }
+
+  void setHighRiskLeverageEnabled(bool value) {
+    if (_highRiskLeverageEnabled == value) return;
+    _highRiskLeverageEnabled = value;
+    notifyListeners();
+    _scheduleSave();
+  }
+
   void setFeeModel(FeeModel value) {
     _feeModel = value;
     notifyListeners();
@@ -142,6 +169,8 @@ class AppPreferencesController extends ChangeNotifier {
       'soundEnabled': _soundEnabled,
       'riskPreset': _riskPreset.name,
       'customRiskPercent': _customRiskPercent,
+      'personalMaxLeverage': _personalMaxLeverage,
+      'highRiskLeverageEnabled': _highRiskLeverageEnabled,
       'feeModel': _feeModel.toJson(),
       'telegramRelayConfig': _telegramRelayConfig.toJson(),
     });

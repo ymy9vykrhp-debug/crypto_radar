@@ -141,6 +141,18 @@ Last updated: 2026-08-28
 - Trade records persist a version/context snapshot. Screenshot, chart snapshot and replay references are reserved without delaying the journal foundation.
 - Verification: `flutter analyze` clean; all 67 tests passed, including dedicated model/engine/storage/widget coverage; Chrome debug launch connected and exited normally.
 
+## DONE — Deterministic calculation hardening
+
+- Exchange-step operations now use decimal arithmetic for `tickSize` and `qtyStep`; quantities floor exactly and LONG/SHORT Stop/TP prices round conservatively.
+- Entry, target and Stop slippage alter execution prices before PnL. Market spread is applied through ask/bid only in explicit market mode.
+- Entry and exit commissions use their own effective notionals and order types. Stop risk includes entry fee, Stop fee and configured safety buffer without double-counting slippage.
+- Added typed validation for missing exchange rules, invalid directions, zero quantity after rounding, exchange minimums, risk overflow and invalid partial TP allocations.
+- TP1/TP2/TP3 support 50/30/20 default partial exits plus weighted Raw/Net Result R.
+- Journal numeric snapshots persist canonical decimal strings and realized calendar/equity statistics follow Exit chronology.
+- Custom risk accepts 0.1–20%. The personal high-risk mode can select up to 10x only inside the mathematical risk and exchange limits; safe leverage remains visible and no execution is enabled.
+- Regression coverage includes tiny/high prices, LONG/SHORT fees and slippage, conservative rounding, partial exits, save/load identity, Profit Factor edge cases, Exit-time equity and closed-candle MFE/MAE.
+- Verification: `flutter analyze` clean; all 86 tests passed.
+
 ## TODO
 
 - Phase 3: deeper Market Structure Engine 2.0 and correction/BOS/CHOCH event history.
