@@ -74,6 +74,13 @@ class ProductDashboardScreen extends StatelessWidget {
               livePrice: livePrice,
             ),
             const SizedBox(height: 14),
+            _ActionAndPlan(
+              decision: decision,
+              color: decisionColor,
+              strings: strings,
+              onCalculateTrade: onCalculateTrade,
+            ),
+            const SizedBox(height: 14),
             LayoutBuilder(
               builder: (BuildContext context, BoxConstraints constraints) {
                 final int columns = constraints.maxWidth >= 1180
@@ -188,13 +195,6 @@ class ProductDashboardScreen extends StatelessWidget {
                   ],
                 );
               },
-            ),
-            const SizedBox(height: 14),
-            _ActionAndPlan(
-              decision: decision,
-              color: decisionColor,
-              strings: strings,
-              onCalculateTrade: onCalculateTrade,
             ),
             const SizedBox(height: 14),
             LayoutBuilder(
