@@ -1,6 +1,6 @@
 # Crypto Radar — Implementation Status
 
-Last updated: 2026-08-27
+Last updated: 2026-08-28
 
 ## DONE — Phase 1 stable core
 
@@ -120,6 +120,27 @@ Last updated: 2026-08-27
 - Added centralized `ProductLinksConfig` plus About & Support. Missing links remain disabled and display `NOT CONFIGURED`.
 - Verification: `flutter analyze` clean; all 55 tests passed; local Telegram relay health smoke-test passed safely without secrets; Chrome debug launch connected and started the application.
 
+## DONE — Stable multi-asset foundation audit
+
+- Re-audited Bybit V5 instruments/tickers, the dynamic USDT Perpetual universe, categories, search, favorites, sorting, cache, error handling, Asset Explorer and the selected-asset Workspace without rewriting working code.
+- Verified that BTCUSDT, FARTCOINUSDT, ETHUSDT, SOLUSDT and XRPUSDT resolve to symbol-isolated candle histories; empty or invalid responses are rejected without replacing valid state.
+- Added deterministic regression coverage for rapid symbol switching and failed/empty Bybit responses.
+- Verification: `flutter analyze` clean; all 57 tests passed; Chrome debug launch succeeded.
+- Git recovery point: `abfcd13` (`phase-1-dynamic-crypto-universe`).
+
+## DONE — Personal Trading Journal foundation
+
+- Expanded the existing Journal into one local Trading Journal with Overview, Trades, Calendar, Performance, Strategies, Mistakes, Notes and Reports; no duplicate storage or second journal was introduced.
+- Manual trades support LONG/SHORT, open and closed lifecycle, planned and actual levels, TP1/TP2/optional TP3, size, margin, leverage, fees, strategy, timeframe, entry reason, free-form notes, tags and structured review fields.
+- PnL, PnL %, planned R:R and Result R are derived from immutable trade records. Manual trades are excluded from Radar research by default.
+- Source separation is explicit for MANUAL, PAPER and future BYBIT_DEMO. A single protected import boundary is ready for Paper/Demo execution facts; LIVE remains reserved and blocked.
+- Journal Settings store a user-defined starting balance plus optional daily/weekly limits. Current Balance uses realized PnL only, so open trades do not alter it.
+- Added period/source/symbol/strategy/result/side filters, sortable trades, interactive details and editable manual records. System execution facts cannot be deleted or overwritten, while personal notes/tags/reviews remain editable.
+- Added a semantic trading calendar, daily reviews and notes, weekly/monthly reports and notes, best/worst day and week, strategy/asset/LONG-vs-SHORT/source breakdowns, mistakes and a fact/tag-based Discipline Score.
+- Added an interactive local Equity Curve with period filtering, zoom/pan/reset and point tooltips. Metrics include balance, PnL/return, Net R, trades, WR, PF, drawdown, averages, streaks and best/worst trades/days.
+- Trade records persist a version/context snapshot. Screenshot, chart snapshot and replay references are reserved without delaying the journal foundation.
+- Verification: `flutter analyze` clean; all 67 tests passed, including dedicated model/engine/storage/widget coverage; Chrome debug launch connected and exited normally.
+
 ## TODO
 
 - Phase 3: deeper Market Structure Engine 2.0 and correction/BOS/CHOCH event history.
@@ -131,6 +152,7 @@ Last updated: 2026-08-27
 - Telegram outgoing `ENTRY_CONFIRMED` delivery is implemented through a local relay. Read-only commands, summaries and other external alert channels remain future work.
 - Advanced chart roadmap: Volume Profile, Footprint/Clusters, Heatmap, Order Flow, Replay, Journal trade overlays and Backtest replay.
 - Remaining UI depth: configurable Assets/Favorites/Opportunity Queue, real Alerts/News feeds, persisted UI preferences, Mistakes/Review editing and complete localization of legacy engine-generated explanation text.
+- Personal Journal next steps: connect the prepared import boundary to a Paper broker first, then a separately secured Bybit Demo broker; screenshot files and replay overlays remain future additions.
 - Product identity/config/help foundation is delivered. Real official URLs, expanded support content and compact sidebar footer remain configuration/polish work.
 - Phases 7–16: see `CRYPTO_RADAR_ROADMAP.md`.
 

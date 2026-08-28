@@ -1,9 +1,15 @@
 # Crypto Radar
 
 Local Flutter market-analysis application for Bybit USDT perpetual instruments.
-It includes the shared Signal Engine, Journal, Trade Tracker, backtest,
+It includes the shared Signal Engine, Personal Trading Journal, Trade Tracker, backtest,
 interactive chart, Smart Position Calculator, safe Telegram notifications and a
 contextual Help Center.
+
+The Journal now includes manual open/closed trades, local notes and reviews,
+calendar summaries, performance breakdowns and an interactive equity curve.
+Set your own Starting Balance in **Journal → Overview → Settings**; open trades
+do not change realized balance. Paper and Bybit Demo imports use the same journal
+model later, while LIVE execution remains blocked.
 
 ## Run the application
 
