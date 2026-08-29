@@ -1,5 +1,10 @@
 # Crypto Radar — Technical Roadmap
 
+> Master Architecture V3 audit: `docs/MASTER_ARCHITECTURE_V3_AUDIT.md`.
+> The audit's safe implementation order supersedes the older feature order
+> below where they conflict. The next phase is **A1 Decision Integrity
+> Stabilization**; no new trading desk or execution connection starts before it.
+
 This document is the compact, durable project master plan. Changes are delivered in small phases; each phase must pass `flutter analyze`, unit/widget tests, and a launch/build check before the next phase starts.
 
 ## Non-negotiable rules
