@@ -31,6 +31,7 @@ class AssetWorkspaceScreen extends StatelessWidget {
     required this.selected,
     required this.onSelected,
     required this.onCalculateTrade,
+    this.onRefresh,
     this.livePrice,
   });
 
@@ -40,6 +41,7 @@ class AssetWorkspaceScreen extends StatelessWidget {
   final WorkspaceSection selected;
   final ValueChanged<WorkspaceSection> onSelected;
   final VoidCallback onCalculateTrade;
+  final VoidCallback? onRefresh;
   final ValueListenable<LivePriceTick?>? livePrice;
 
   @override
@@ -119,6 +121,7 @@ class AssetWorkspaceScreen extends StatelessWidget {
           onWhy: () => onSelected(WorkspaceSection.why),
           onOpenWorkspace: () => onSelected(WorkspaceSection.chart),
           onCalculateTrade: onCalculateTrade,
+          onRefresh: onRefresh,
         );
       case WorkspaceSection.chart:
         return ChartScreen(

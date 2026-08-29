@@ -540,6 +540,7 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
           onWhy: () => _openWorkspace(WorkspaceSection.why),
           onOpenWorkspace: () => _openWorkspace(WorkspaceSection.overview),
           onCalculateTrade: () => _openPositionCalculator(_snapshot!),
+          onRefresh: _loading ? null : _refresh,
         );
       case AppSection.market:
         return _buildMarketContent();
@@ -627,6 +628,7 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
                       selected: _workspaceSection,
                       onCalculateTrade: () =>
                           _openPositionCalculator(_snapshot!),
+                      onRefresh: _loading ? null : _refresh,
                       onSelected: (WorkspaceSection value) =>
                           setState(() => _workspaceSection = value),
                     ),
