@@ -20,8 +20,10 @@ class AppPreferencesController extends ChangeNotifier {
   bool _soundEnabled = true;
   RiskPreset _riskPreset = RiskPreset.normal;
   double _customRiskPercent = 2.0;
+  double _accountEquity = 0.0;
+  double _accountRiskPercent = 0.5;
   int _personalMaxLeverage = 10;
-  bool _highRiskLeverageEnabled = true;
+  bool _highRiskLeverageEnabled = false;
   FeeModel _feeModel = const FeeModel();
   TelegramRelayConfig _telegramRelayConfig = const TelegramRelayConfig();
   bool _initialized = false;
@@ -35,6 +37,8 @@ class AppPreferencesController extends ChangeNotifier {
   double get effectiveRiskPercent => _riskPreset == RiskPreset.custom
       ? _customRiskPercent
       : _riskPreset.defaultPercent;
+  double get accountEquity => _accountEquity;
+  double get accountRiskPercent => _accountRiskPercent;
   int get personalMaxLeverage => _personalMaxLeverage;
   bool get highRiskLeverageEnabled => _highRiskLeverageEnabled;
   FeeModel get feeModel => _feeModel;
@@ -72,6 +76,19 @@ class AppPreferencesController extends ChangeNotifier {
           : double.tryParse('$customRisk') ?? _customRiskPercent;
       if (parsedRisk.isFinite && parsedRisk >= 0.1 && parsedRisk <= 20.0) {
         _customRiskPercent = parsedRisk;
+      }
+      final double parsedEquity =
+          double.tryParse('${decoded['accountEquity']}') ?? _accountEquity;
+      if (parsedEquity.isFinite && parsedEquity >= 0.0) {
+        _accountEquity = parsedEquity;
+      }
+      final double parsedAccountRisk =
+          double.tryParse('${decoded['accountRiskPercent']}') ??
+          _accountRiskPercent;
+      if (parsedAccountRisk.isFinite &&
+          parsedAccountRisk >= 0.1 &&
+          parsedAccountRisk <= 1.0) {
+        _accountRiskPercent = parsedAccountRisk;
       }
       final int parsedLeverage =
           int.tryParse('${decoded['personalMaxLeverage']}') ??
@@ -132,6 +149,25 @@ class AppPreferencesController extends ChangeNotifier {
     _scheduleSave();
   }
 
+  void setAccountEquity(double value) {
+    if (!value.isFinite || value < 0.0 || _accountEquity == value) return;
+    _accountEquity = value;
+    notifyListeners();
+    _scheduleSave();
+  }
+
+  void setAccountRiskPercent(double value) {
+    if (!value.isFinite ||
+        value < 0.1 ||
+        value > 1.0 ||
+        _accountRiskPercent == value) {
+      return;
+    }
+    _accountRiskPercent = value;
+    notifyListeners();
+    _scheduleSave();
+  }
+
   void setPersonalMaxLeverage(int value) {
     if (value < 1 || value > 10 || _personalMaxLeverage == value) return;
     _personalMaxLeverage = value;
@@ -169,6 +205,8 @@ class AppPreferencesController extends ChangeNotifier {
       'soundEnabled': _soundEnabled,
       'riskPreset': _riskPreset.name,
       'customRiskPercent': _customRiskPercent,
+      'accountEquity': _accountEquity,
+      'accountRiskPercent': _accountRiskPercent,
       'personalMaxLeverage': _personalMaxLeverage,
       'highRiskLeverageEnabled': _highRiskLeverageEnabled,
       'feeModel': _feeModel.toJson(),

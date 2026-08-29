@@ -1,3 +1,4 @@
+import 'account_risk_models.dart';
 import 'decision_models.dart';
 import 'execution_models.dart';
 import 'market_models.dart';
@@ -163,6 +164,7 @@ enum TradeValidationCode {
   belowMinimumNotional,
   riskLimitExceeded,
   invalidTargetAllocations,
+  accountRiskBlocked,
 }
 
 class TradeValidationIssue {
@@ -209,6 +211,8 @@ class SmartPositionInput {
     this.targetAllocations = const <double>[],
     this.personalMaxLeverage = 10,
     this.highRiskLeverageEnabled = false,
+    this.accountRiskPolicy,
+    this.accountRiskState = const AccountRiskState(),
   });
 
   factory SmartPositionInput.fromDecision({
@@ -217,7 +221,7 @@ class SmartPositionInput {
     required double allocatedMargin,
     required double riskPercent,
     double volatilityPercent = 0.0,
-    double exchangeMaxLeverage = 10.0,
+    double exchangeMaxLeverage = 0.0,
     double quantityStep = 0.0,
     double minOrderQuantity = 0.0,
     double minNotional = 0.0,
@@ -250,13 +254,19 @@ class SmartPositionInput {
       setupType: decision.selectedStrategy,
       allocatedMargin: allocatedMargin,
       riskPercent: riskPercent,
-      exchangeMaxLeverage: exchangeMaxLeverage <= 0
-          ? 10.0
-          : exchangeMaxLeverage,
-      quantityStep: quantityStep,
-      minOrderQuantity: minOrderQuantity,
-      minNotional: minNotional,
-      tickSize: tickSize,
+      exchangeMaxLeverage: exchangeMaxLeverage > 0
+          ? exchangeMaxLeverage
+          : market.tradingRules?.maxLeverage ?? 0.0,
+      quantityStep: quantityStep > 0
+          ? quantityStep
+          : market.tradingRules?.quantityStep ?? 0.0,
+      minOrderQuantity: minOrderQuantity > 0
+          ? minOrderQuantity
+          : market.tradingRules?.minOrderQuantity ?? 0.0,
+      minNotional: minNotional > 0
+          ? minNotional
+          : market.tradingRules?.minNotional ?? 0.0,
+      tickSize: tickSize > 0 ? tickSize : market.tradingRules?.tickSize ?? 0.0,
       observedSpreadPercent: market.ticker.spreadPercent,
       bidPrice: market.ticker.bidPrice,
       askPrice: market.ticker.askPrice,
@@ -301,6 +311,8 @@ class SmartPositionInput {
   final List<double> targetAllocations;
   final int personalMaxLeverage;
   final bool highRiskLeverageEnabled;
+  final AccountRiskPolicy? accountRiskPolicy;
+  final AccountRiskState accountRiskState;
 
   double get atrPercent => entry <= 0 ? 0 : atr / entry * 100.0;
 
@@ -326,6 +338,8 @@ class SmartPositionInput {
     List<double>? targetAllocations,
     int? personalMaxLeverage,
     bool? highRiskLeverageEnabled,
+    AccountRiskPolicy? accountRiskPolicy,
+    AccountRiskState? accountRiskState,
   }) {
     return SmartPositionInput(
       symbol: symbol,
@@ -365,6 +379,8 @@ class SmartPositionInput {
       personalMaxLeverage: personalMaxLeverage ?? this.personalMaxLeverage,
       highRiskLeverageEnabled:
           highRiskLeverageEnabled ?? this.highRiskLeverageEnabled,
+      accountRiskPolicy: accountRiskPolicy ?? this.accountRiskPolicy,
+      accountRiskState: accountRiskState ?? this.accountRiskState,
     );
   }
 }
@@ -497,6 +513,7 @@ class SmartTradePlan {
     required this.validationIssues,
     required this.maxNotionalByRisk,
     required this.effectiveLossPercent,
+    this.accountRiskDecision,
   });
 
   final String symbol;
@@ -529,6 +546,7 @@ class SmartTradePlan {
   final List<TradeValidationIssue> validationIssues;
   final double maxNotionalByRisk;
   final double effectiveLossPercent;
+  final AccountRiskDecision? accountRiskDecision;
 
   bool get isBlocked => safetyStatus == TradeSafetyStatus.blocked;
   bool get isValid => validationIssues.isEmpty;

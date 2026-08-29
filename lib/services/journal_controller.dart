@@ -8,6 +8,7 @@ import '../engines/phase_a_engine.dart';
 import '../engines/signal_engine.dart';
 import '../engines/strategy_learning_engine.dart';
 import '../engines/trade_tracker.dart';
+import '../engines/trade_outcome_classifier.dart';
 import '../models/backtest_models.dart';
 import '../models/execution_models.dart';
 import '../models/market_models.dart';
@@ -272,6 +273,9 @@ class JournalController extends ChangeNotifier {
       );
       if (tracked.status == SignalStatus.waitingEntry) {
         tracked = PhaseAEngine.update(market: snapshot, signal: tracked);
+      }
+      if (!tracked.status.isActive) {
+        tracked = TradeOutcomeClassifier.classify(tracked);
       }
       if (jsonEncode(tracked.toJson()) != jsonEncode(signal.toJson())) {
         _signals[index] = tracked;

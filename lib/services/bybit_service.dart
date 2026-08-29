@@ -77,16 +77,26 @@ class BybitService implements MarketDataProvider {
     final Future<List<Candle>> fiveFuture = loadCandles(symbol, '5');
     final Future<List<Candle>> fifteenFuture = loadCandles(symbol, '15');
     final Future<List<Candle>> hourFuture = loadCandles(symbol, '60');
-    final Future<TickerStats> tickerFuture = loadTicker(symbol);
+    // Attach error handlers immediately. These requests run in parallel with
+    // candles and may fail before they are awaited; a late try/catch would let
+    // the Future report an unhandled asynchronous error in that interval.
+    final Future<TickerStats?> tickerFuture = loadTicker(symbol)
+        .then<TickerStats?>(
+          (TickerStats value) => value,
+          onError: (Object _, StackTrace _) => null,
+        );
+    final Future<InstrumentTradingRules?> rulesFuture = loadTradingRules(symbol)
+        .then<InstrumentTradingRules?>(
+          (InstrumentTradingRules? value) => value,
+          onError: (Object _, StackTrace _) => null,
+        );
 
     final List<Candle> oneCandles = await oneFuture;
     final List<Candle> fiveCandles = await fiveFuture;
     final List<Candle> fifteenCandles = await fifteenFuture;
     final List<Candle> hourCandles = await hourFuture;
-    TickerStats ticker;
-    try {
-      ticker = await tickerFuture;
-    } on Object {
+    TickerStats? ticker = await tickerFuture;
+    if (ticker == null) {
       final double current = fiveCandles.last.close;
       final double first = fiveCandles.first.close;
       final double change = first == 0.0
@@ -100,8 +110,10 @@ class BybitService implements MarketDataProvider {
         price: current,
         change24hPercent: change,
         turnover24h: turnover,
+        sourceUpdatedAt: DateTime.now().toUtc(),
       );
     }
+    final InstrumentTradingRules? tradingRules = await rulesFuture;
 
     return SignalEngine.buildSnapshot(
       symbol: symbol,
@@ -110,6 +122,8 @@ class BybitService implements MarketDataProvider {
       fiveCandles: fiveCandles,
       fifteenCandles: fifteenCandles,
       hourCandles: hourCandles,
+      tradingRules: tradingRules,
+      observedAt: DateTime.now().toUtc(),
     );
   }
 
@@ -161,7 +175,7 @@ class BybitService implements MarketDataProvider {
         throw const FormatException('Повреждённая свеча');
       }
       return Candle(
-        time: DateTime.fromMillisecondsSinceEpoch(_toInt(raw[0])),
+        time: DateTime.fromMillisecondsSinceEpoch(_toInt(raw[0]), isUtc: true),
         open: _toDouble(raw[1]),
         high: _toDouble(raw[2]),
         low: _toDouble(raw[3]),
@@ -230,6 +244,7 @@ class BybitService implements MarketDataProvider {
           minOrderQuantity: instrument.minOrderQuantity,
           minNotional: instrument.minNotional,
           maxLeverage: instrument.maxLeverage,
+          leverageStep: instrument.leverageStep,
         );
       }
     }
@@ -258,6 +273,13 @@ class BybitService implements MarketDataProvider {
     if (decoded is! Map<String, dynamic>) {
       throw Exception('Неожиданный ticker');
     }
+    if (_toInt(decoded['retCode']) != 0) {
+      throw Exception(decoded['retMsg']?.toString() ?? 'Ошибка Bybit ticker');
+    }
+    final int sourceMilliseconds = _toInt(decoded['time']);
+    final DateTime? sourceUpdatedAt = sourceMilliseconds <= 0
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(sourceMilliseconds, isUtc: true);
     final Object? result = decoded['result'];
     final Object? rawList = result is Map<String, dynamic>
         ? result['list']
@@ -304,6 +326,8 @@ class BybitService implements MarketDataProvider {
       openInterest: _toDouble(first['openInterest']),
       openInterestValue: _toDouble(first['openInterestValue']),
       orderBookUpdatedAt: orderBookUpdatedAt,
+      sourceUpdatedAt: sourceUpdatedAt,
+      fundingUpdatedAt: sourceUpdatedAt,
     );
   }
 
@@ -372,6 +396,7 @@ class BybitService implements MarketDataProvider {
               quantityStep: _toDouble(lotSize['qtyStep']),
               minOrderQuantity: _toDouble(lotSize['minOrderQty']),
               minNotional: _toDouble(lotSize['minNotionalValue']),
+              leverageStep: _toDouble(leverage['leverageStep']),
             ),
           );
         }
@@ -474,6 +499,7 @@ class _InstrumentSpec {
     required this.quantityStep,
     required this.minOrderQuantity,
     required this.minNotional,
+    required this.leverageStep,
   });
 
   final String symbol;
@@ -487,4 +513,5 @@ class _InstrumentSpec {
   final double quantityStep;
   final double minOrderQuantity;
   final double minNotional;
+  final double leverageStep;
 }

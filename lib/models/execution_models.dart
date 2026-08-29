@@ -190,6 +190,10 @@ class SignalQualityScores {
     required this.entry,
     required this.stop,
     required this.risk,
+    this.location = 0,
+    this.liquidity = 0,
+    this.data = 0,
+    this.setup = 0,
   });
 
   static const SignalQualityScores unrated = SignalQualityScores(
@@ -203,6 +207,10 @@ class SignalQualityScores {
   final int entry;
   final int stop;
   final int risk;
+  final int location;
+  final int liquidity;
+  final int data;
+  final int setup;
 
   String get riskLabel {
     if (risk >= 75) {
@@ -219,6 +227,10 @@ class SignalQualityScores {
     'entry': entry,
     'stop': stop,
     'risk': risk,
+    'location': location,
+    'liquidity': liquidity,
+    'data': data,
+    'setup': setup,
   };
 
   factory SignalQualityScores.fromJson(Object? raw) {
@@ -230,6 +242,10 @@ class SignalQualityScores {
       entry: _asInt(raw['entry']),
       stop: _asInt(raw['stop']),
       risk: _asInt(raw['risk']),
+      location: _asInt(raw['location']),
+      liquidity: _asInt(raw['liquidity']),
+      data: _asInt(raw['data']),
+      setup: _asInt(raw['setup']),
     );
   }
 }

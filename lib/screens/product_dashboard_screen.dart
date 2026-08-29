@@ -124,6 +124,23 @@ class ProductDashboardScreen extends StatelessWidget {
                     ),
                     _metric(
                       width,
+                      strings.pick('Качество зоны', 'Location Quality'),
+                      '${decision.qualityScores.location}/100',
+                      Icons.location_on_outlined,
+                      decisionColor,
+                    ),
+                    _metric(
+                      width,
+                      strings.pick(
+                        'Подтверждение ликвидности',
+                        'Liquidity Confirmation',
+                      ),
+                      '${decision.qualityScores.liquidity}/100',
+                      Icons.water_drop_outlined,
+                      decisionColor,
+                    ),
+                    _metric(
+                      width,
                       strings.pick('Качество стопа', 'Stop Quality'),
                       '${decision.qualityScores.stop}/100',
                       Icons.health_and_safety_outlined,
@@ -137,6 +154,15 @@ class ProductDashboardScreen extends StatelessWidget {
                       decision.marketRegime.label,
                       Icons.public_rounded,
                       semantic.neutral,
+                    ),
+                    _metric(
+                      width,
+                      strings.pick('Качество риска', 'Risk Quality'),
+                      '${decision.qualityScores.risk}/100',
+                      Icons.shield_outlined,
+                      decision.qualityScores.risk >= 70
+                          ? semantic.bullish
+                          : semantic.warning,
                     ),
                     _metric(
                       width,

@@ -1,6 +1,6 @@
 # Crypto Radar — Implementation Status
 
-Last updated: 2026-08-28
+Last updated: 2026-08-29
 
 ## DONE — Phase 1 stable core
 
@@ -153,13 +153,50 @@ Last updated: 2026-08-28
 - Regression coverage includes tiny/high prices, LONG/SHORT fees and slippage, conservative rounding, partial exits, save/load identity, Profit Factor edge cases, Exit-time equity and closed-candle MFE/MAE.
 - Verification: `flutter analyze` clean; all 86 tests passed.
 
+## DONE — Market-data integrity and cost-aware research foundation
+
+- Added a mandatory `MarketDataIntegrity` gate. It validates source timestamps,
+  candle ordering/gaps/OHLC, bid/ask freshness and complete Bybit instrument
+  rules before a snapshot may receive HIGH/MEDIUM/LOW quality.
+- The Stop Engine no longer invents `tickSize` or quantity constraints. Missing
+  real exchange rules produce `INSTRUMENT_RULES_UNAVAILABLE` and block the
+  setup instead of calculating a misleading trade plan.
+- Added `HistoricalDataStore` with 1000-candle pagination, UTC normalization,
+  deduplication, validation and local IndexedDB/file cache. Network failures do
+  not erase previously validated history.
+- Added a pure `ExecutionSimulator` for research only. It models bid/ask spread,
+  separate entry/exit slippage, maker/taker fees on actual notionals, partial
+  targets, optional funding events, exchange minimums and conservative
+  Stop-before-TP ordering inside an ambiguous candle.
+- Backtest headline Average R, Profit Factor and Drawdown now use net results.
+  Raw and Net metrics plus total execution cost and Cost/Gross remain visible
+  separately and survive report serialization.
+- Added an `AccountRiskEngine` with account-equity risk, daily/weekly R limits,
+  consecutive-loss cooldown, exposure/position limits and duplicate/conflicting
+  position vetoes. It is active in the calculator only after account equity is
+  configured; execution remains disabled.
+- New installations no longer enable the personal high-risk leverage override
+  by default. Signal generation stores 1x as a neutral reference; allowed
+  leverage is calculated only after structural Stop, costs and account risk.
+- Direction, location, entry, stop, liquidity, data, setup and risk quality are
+  stored separately. Journal records retain engine versions and outcome flags,
+  including `STOP_THEN_TARGET`, so a tight/liquidity Stop is not mislabeled as a
+  wrong directional call.
+- Regression tests cover data-quality vetoes, historical pagination/cache,
+  LONG/SHORT cost-aware simulation, funding, same-candle ambiguity, account
+  risk, old-report compatibility and outcome classification.
+- Verification: `flutter analyze` clean; all 104 tests passed; Chrome debug
+  launch connected, reached `main()` and exited normally without runtime errors.
+
 ## TODO
 
 - Phase 3: deeper Market Structure Engine 2.0 and correction/BOS/CHOCH event history.
 - Phase 4: scored Heavy Levels, OB, FVG and Liquidity engines.
 - Phase 5: breakout/rejection and candle/volume behaviour.
 - Phase 6: full Market Regime, Strategy Selector and explicit NO TRADE.
-- Full rolling walk-forward/OOS research, fees and slippage remain required before Paper Trading.
+- Full 6–12 month rolling walk-forward/OOS research remains required before
+  Paper Trading. The execution-cost model is implemented; historical fee-tier,
+  funding and spread datasets still need a verified source for long studies.
 - A Pine Script mirror may be added after the strategy is stable, but it would recalculate the strategy inside TradingView rather than read local Flutter signals. A licensed Advanced Charts integration is a later deployment option.
 - Telegram outgoing `ENTRY_CONFIRMED` delivery is implemented through a local relay. Read-only commands, summaries and other external alert channels remain future work.
 - Advanced chart roadmap: Volume Profile, Footprint/Clusters, Heatmap, Order Flow, Replay, Journal trade overlays and Backtest replay.
@@ -173,3 +210,5 @@ Last updated: 2026-08-28
 - Current market-regime and entry-state labels in Phase 2 are preliminary summaries of existing engine outputs, not the future Phase 6 classifier.
 - Scores and R:R target estimates are not guarantees or financial advice.
 - Bybit remains market-data-only; no order, balance or position APIs are used.
+- `ExecutionSimulator` is deterministic research code only. Demo, Auto Demo and
+  LIVE order submission remain disconnected and blocked.

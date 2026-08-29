@@ -1,6 +1,8 @@
 import '../models/execution_models.dart';
+import '../models/market_data_models.dart';
 import '../models/market_models.dart';
 import '../models/signal_models.dart';
+import '../utils/exchange_decimal.dart';
 
 class StopEngine {
   const StopEngine._();
@@ -10,15 +12,30 @@ class StopEngine {
     required TimeframeAnalysis analysis,
     required FalseBreakoutAnalysis falseBreakout,
     StopVariant variant = StopVariant.structuralAtr,
+    InstrumentTradingRules? tradingRules,
   }) {
     final double entry = signal.entryPrice;
+    if (tradingRules == null || !tradingRules.isComplete) {
+      return StopPlan(
+        variant: variant,
+        invalidationPrice: signal.stop,
+        stopPrice: signal.stop,
+        buffer: 0.0,
+        bufferAtr: 0.0,
+        bufferPercent: 0.0,
+        riskReward: 0.0,
+        safe: false,
+        quality: 0,
+        reasonCodes: const <String>['INSTRUMENT_RULES_UNAVAILABLE'],
+      );
+    }
     final double atr = analysis.atr > 0.0 ? analysis.atr : entry * 0.005;
     final double invalidation = _invalidation(
       signal: signal,
       analysis: analysis,
       atr: atr,
     );
-    final double tickSize = _estimatedTickSize(entry);
+    final double tickSize = tradingRules.tickSize;
     final double typicalWick = _typicalAdverseWick(
       analysis.candles,
       signal.direction,
@@ -50,7 +67,12 @@ class StopEngine {
     }
 
     final bool bullish = signal.direction == SignalDirection.long;
-    final double stop = bullish ? invalidation - buffer : invalidation + buffer;
+    final double rawStop = bullish
+        ? invalidation - buffer
+        : invalidation + buffer;
+    final double stop = bullish
+        ? ExchangeDecimal.floorToStep(rawStop, tickSize)
+        : ExchangeDecimal.ceilToStep(rawStop, tickSize);
     final double riskDistance = (entry - stop).abs();
     final double rewardDistance = (signal.tp1 - entry).abs();
     final double riskReward = riskDistance == 0.0
@@ -154,19 +176,6 @@ class StopEngine {
       count++;
     }
     return count == 0 ? 0.0 : total / count;
-  }
-
-  static double _estimatedTickSize(double price) {
-    if (price >= 10000.0) {
-      return 0.10;
-    }
-    if (price >= 100.0) {
-      return 0.01;
-    }
-    if (price >= 1.0) {
-      return 0.0001;
-    }
-    return 0.000001;
   }
 
   static void _addBelow(List<double> target, double? value, double entry) {

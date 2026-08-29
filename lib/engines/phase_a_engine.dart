@@ -1,4 +1,5 @@
 import '../models/execution_models.dart';
+import '../models/market_data_models.dart';
 import '../models/market_models.dart';
 import '../models/signal_models.dart';
 import 'entry_engine.dart';
@@ -25,6 +26,7 @@ class PhaseAEngine {
       analysis: trigger,
       falseBreakout: falseBreakout,
       variant: stopVariant,
+      tradingRules: market.tradingRules,
     );
     final EntryAssessment entry = EntryEngine.assess(
       signal: signal,
@@ -34,20 +36,40 @@ class PhaseAEngine {
       variant: entryVariant,
     );
     final SignalQualityScores qualities = _qualities(
+      market: market,
       direction: market.strength,
       entry: entry.entryQuality,
       stopPlan: stopPlan,
+      falseBreakout: falseBreakout,
     );
+    final bool dataBlocked =
+        market.dataIntegrity.checkedAt != null &&
+        market.dataIntegrity.hasCriticalIssue;
+    final SignalQualityScores effectiveQualities = dataBlocked
+        ? SignalQualityScores(
+            direction: qualities.direction,
+            entry: 0,
+            stop: stopPlan.quality,
+            risk: 0,
+            location: qualities.location,
+            liquidity: qualities.liquidity,
+            data: 0,
+            setup: qualities.setup,
+          )
+        : qualities;
     final List<String> codes = _mergeCodes(<Iterable<String>>[
       signal.reasonCodes,
       const <String>['SETUP_FOUND'],
       stopPlan.reasonCodes,
       entry.reasonCodes,
+      if (dataBlocked) market.dataIntegrity.issues,
     ]);
     final String preparedId = signal.id.endsWith(':$profileId')
         ? signal.id
         : '${signal.id}:$profileId';
-    final SignalStage initialStage = entryVariant.mode == EntryMode.aggressive
+    final SignalStage initialStage = dataBlocked
+        ? SignalStage.setupFound
+        : entryVariant.mode == EntryMode.aggressive
         ? entry.stage
         : SignalStage.setupFound;
     final DateTime? initialConfirmationTime =
@@ -62,14 +84,16 @@ class PhaseAEngine {
       entryVariant: entryVariant,
       stopVariant: stopVariant,
       executionProfileId: profileId,
-      qualities: qualities,
+      qualities: effectiveQualities,
       invalidationPrice: stopPlan.invalidationPrice,
       structuralStop: stopPlan.invalidationPrice,
       stop: stopPlan.stopPrice,
       stopBuffer: stopPlan.buffer,
       stopBufferAtr: stopPlan.bufferAtr,
-      stopIsSafe: stopPlan.safe,
-      executionAction: entryVariant.mode == EntryMode.aggressive
+      stopIsSafe: stopPlan.safe && !dataBlocked,
+      executionAction: dataBlocked
+          ? 'NO TRADE: критические рыночные данные отсутствуют или устарели.'
+          : entryVariant.mode == EntryMode.aggressive
           ? entry.action
           : stopPlan.safe
           ? 'SETUP FOUND: ждём зону и подтверждающий триггер.'
@@ -101,6 +125,7 @@ class PhaseAEngine {
       analysis: trigger,
       falseBreakout: falseBreakout,
       variant: signal.stopVariant,
+      tradingRules: market.tradingRules,
     );
     final EntryAssessment entry = EntryEngine.assess(
       signal: signal,
@@ -109,31 +134,55 @@ class PhaseAEngine {
       stopIsSafe: stopPlan.safe,
     );
     final SignalQualityScores qualities = _qualities(
+      market: market,
       direction: signal.qualities.direction > 0
           ? signal.qualities.direction
           : market.strength,
       entry: entry.entryQuality,
       stopPlan: stopPlan,
+      falseBreakout: falseBreakout,
     );
-    final DateTime? confirmationTime = entry.stage == SignalStage.entryConfirmed
+    final bool dataBlocked =
+        market.dataIntegrity.checkedAt != null &&
+        market.dataIntegrity.hasCriticalIssue;
+    final SignalQualityScores effectiveQualities = dataBlocked
+        ? SignalQualityScores(
+            direction: qualities.direction,
+            entry: 0,
+            stop: stopPlan.quality,
+            risk: 0,
+            location: qualities.location,
+            liquidity: qualities.liquidity,
+            data: 0,
+            setup: qualities.setup,
+          )
+        : qualities;
+    final SignalStage effectiveStage = dataBlocked
+        ? SignalStage.setupFound
+        : entry.stage;
+    final DateTime? confirmationTime =
+        effectiveStage == SignalStage.entryConfirmed
         ? signal.entryConfirmedTime ?? _evaluationTime(market, signal)
         : signal.entryConfirmedTime;
     final List<String> codes = _mergeCodes(<Iterable<String>>[
       signal.reasonCodes,
       stopPlan.reasonCodes,
       entry.reasonCodes,
+      if (dataBlocked) market.dataIntegrity.issues,
     ]);
 
     return signal.copyWith(
-      stage: entry.stage,
-      qualities: qualities,
+      stage: effectiveStage,
+      qualities: effectiveQualities,
       invalidationPrice: stopPlan.invalidationPrice,
       structuralStop: stopPlan.invalidationPrice,
       stop: stopPlan.stopPrice,
       stopBuffer: stopPlan.buffer,
       stopBufferAtr: stopPlan.bufferAtr,
-      stopIsSafe: stopPlan.safe,
-      executionAction: entry.action,
+      stopIsSafe: stopPlan.safe && !dataBlocked,
+      executionAction: dataBlocked
+          ? 'NO TRADE: критические рыночные данные отсутствуют или устарели.'
+          : entry.action,
       falseBreakoutState: falseBreakout.state,
       falseBreakoutLevel: falseBreakout.level,
       falseBreakoutScore: falseBreakout.score,
@@ -168,9 +217,11 @@ class PhaseAEngine {
   }
 
   static SignalQualityScores _qualities({
+    required MarketSnapshot market,
     required int direction,
     required int entry,
     required StopPlan stopPlan,
+    required FalseBreakoutAnalysis falseBreakout,
   }) {
     final int risk = !stopPlan.safe
         ? 35
@@ -179,12 +230,65 @@ class PhaseAEngine {
         : stopPlan.riskReward >= 1.0
         ? 76
         : 58;
+    final int location = _locationQuality(market);
+    final int liquidity = falseBreakout.state == FalseBreakoutState.confirmed
+        ? 92
+        : falseBreakout.state == FalseBreakoutState.possible
+        ? 58
+        : market.fifteenMinutes.liquidity.sweepAbove ||
+              market.fifteenMinutes.liquidity.sweepBelow
+        ? 78
+        : 35;
+    final int data = switch (market.dataIntegrity.level) {
+      MarketDataQualityLevel.high => 95,
+      MarketDataQualityLevel.medium => 65,
+      MarketDataQualityLevel.low => 0,
+    };
+    final int setup = ((direction + location + liquidity) / 3.0).round();
     return SignalQualityScores(
       direction: _clampInt(direction, 0, 100),
       entry: _clampInt(entry, 0, 100),
       stop: stopPlan.quality,
       risk: risk,
+      location: location,
+      liquidity: liquidity,
+      data: data,
+      setup: _clampInt(setup, 0, 100),
     );
+  }
+
+  static int _locationQuality(MarketSnapshot market) {
+    final TimeframeAnalysis analysis = market.fifteenMinutes;
+    final double price = market.ticker.price;
+    final double atr = analysis.atr;
+    if (price <= 0.0 || atr <= 0.0) return 0;
+    int quality = 30;
+    final Iterable<double> levels = <double?>[
+      analysis.support,
+      analysis.resistance,
+      analysis.structure.lastSwingHigh,
+      analysis.structure.lastSwingLow,
+    ].whereType<double>();
+    if (levels.any((double level) => (level - price).abs() <= atr * 0.5)) {
+      quality += 30;
+    }
+    final Iterable<PriceZone> zones = <PriceZone>[
+      ...analysis.orderBlocks,
+      ...analysis.fairValueGaps,
+    ];
+    if (zones.any(
+      (PriceZone zone) =>
+          price >= zone.lower - atr * 0.25 && price <= zone.upper + atr * 0.25,
+    )) {
+      quality += 25;
+    }
+    final double? support = analysis.support;
+    final double? resistance = analysis.resistance;
+    if (support != null && resistance != null && resistance > support) {
+      final double position = (price - support) / (resistance - support);
+      if (position >= 0.4 && position <= 0.6) quality -= 20;
+    }
+    return _clampInt(quality, 0, 100);
   }
 
   static List<String> _mergeCodes(List<Iterable<String>> groups) {

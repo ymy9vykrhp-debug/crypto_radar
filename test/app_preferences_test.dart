@@ -17,8 +17,10 @@ void main() {
     expect(controller.soundEnabled, isTrue);
     expect(controller.riskPreset, RiskPreset.normal);
     expect(controller.effectiveRiskPercent, 2);
+    expect(controller.accountEquity, 0);
+    expect(controller.accountRiskPercent, 0.5);
     expect(controller.personalMaxLeverage, 10);
-    expect(controller.highRiskLeverageEnabled, isTrue);
+    expect(controller.highRiskLeverageEnabled, isFalse);
     expect(const AppStrings(AppLanguage.ru).instrument, 'Инструмент');
 
     controller.setThemeMode(ThemeMode.light);
@@ -40,6 +42,8 @@ void main() {
     );
     first.setRiskPreset(RiskPreset.custom);
     first.setCustomRiskPercent(2.5);
+    first.setAccountEquity(5000);
+    first.setAccountRiskPercent(0.7);
     first.setPersonalMaxLeverage(9);
     first.setHighRiskLeverageEnabled(false);
     first.setFeeModel(
@@ -64,6 +68,8 @@ void main() {
 
     expect(restored.riskPreset, RiskPreset.custom);
     expect(restored.effectiveRiskPercent, 2.5);
+    expect(restored.accountEquity, 5000);
+    expect(restored.accountRiskPercent, 0.7);
     expect(restored.personalMaxLeverage, 9);
     expect(restored.highRiskLeverageEnabled, isFalse);
     expect(restored.feeModel.makerFeePercent, 0.01);

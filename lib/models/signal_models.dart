@@ -41,6 +41,35 @@ enum SignalStatus {
   expired,
 }
 
+enum TradeOutcomeFlag {
+  directionWrong,
+  entryTooEarly,
+  entryTooLate,
+  chaseEntry,
+  stopTooTight,
+  stopInLiquidity,
+  realInvalidation,
+  noConfirmation,
+  badRiskReward,
+  newsEvent,
+  regimeError,
+  goodSetupBadExecution,
+  falseBreakout,
+  liquiditySweepBeforeMove,
+  stopThenTarget,
+  unknown,
+}
+
+enum TradeQualityFlag {
+  goodDirection,
+  goodLocation,
+  goodEntry,
+  goodStop,
+  goodRisk,
+  planFollowed,
+  goodTrade,
+}
+
 extension SignalStatusText on SignalStatus {
   String get code {
     switch (this) {
@@ -127,6 +156,24 @@ class RadarSignal {
     this.mfePercent = 0.0,
     this.maePercent = 0.0,
     this.resultR = 0.0,
+    this.hasCostAwareResult = false,
+    this.rawResultR = 0.0,
+    this.netResultR = 0.0,
+    this.grossPnl = 0.0,
+    this.netPnl = 0.0,
+    this.entryFee = 0.0,
+    this.exitFees = 0.0,
+    this.spreadCost = 0.0,
+    this.slippageCost = 0.0,
+    this.fundingCost = 0.0,
+    this.simulatedQuantity = 0.0,
+    this.executionModelVersion = '',
+    this.outcomeFlags = const <TradeOutcomeFlag>[],
+    this.qualityFlags = const <TradeQualityFlag>[],
+    this.strategyVersion = 'STRATEGY_V1',
+    this.entryEngineVersion = 'ENTRY_ENGINE_V2',
+    this.stopEngineVersion = 'STOP_ENGINE_V2',
+    this.liquidityEngineVersion = 'LIQUIDITY_ENGINE_V1',
     this.stopTime,
     this.maximumOvershootPrice = 0.0,
     this.overshootPoints = 0.0,
@@ -197,6 +244,24 @@ class RadarSignal {
   final double mfePercent;
   final double maePercent;
   final double resultR;
+  final bool hasCostAwareResult;
+  final double rawResultR;
+  final double netResultR;
+  final double grossPnl;
+  final double netPnl;
+  final double entryFee;
+  final double exitFees;
+  final double spreadCost;
+  final double slippageCost;
+  final double fundingCost;
+  final double simulatedQuantity;
+  final String executionModelVersion;
+  final List<TradeOutcomeFlag> outcomeFlags;
+  final List<TradeQualityFlag> qualityFlags;
+  final String strategyVersion;
+  final String entryEngineVersion;
+  final String stopEngineVersion;
+  final String liquidityEngineVersion;
   final DateTime? stopTime;
   final double maximumOvershootPrice;
   final double overshootPoints;
@@ -315,6 +380,24 @@ class RadarSignal {
     double? mfePercent,
     double? maePercent,
     double? resultR,
+    bool? hasCostAwareResult,
+    double? rawResultR,
+    double? netResultR,
+    double? grossPnl,
+    double? netPnl,
+    double? entryFee,
+    double? exitFees,
+    double? spreadCost,
+    double? slippageCost,
+    double? fundingCost,
+    double? simulatedQuantity,
+    String? executionModelVersion,
+    List<TradeOutcomeFlag>? outcomeFlags,
+    List<TradeQualityFlag>? qualityFlags,
+    String? strategyVersion,
+    String? entryEngineVersion,
+    String? stopEngineVersion,
+    String? liquidityEngineVersion,
     List<String>? reasonCodes,
     DateTime? stopTime,
     double? maximumOvershootPrice,
@@ -388,6 +471,26 @@ class RadarSignal {
       mfePercent: mfePercent ?? this.mfePercent,
       maePercent: maePercent ?? this.maePercent,
       resultR: resultR ?? this.resultR,
+      hasCostAwareResult: hasCostAwareResult ?? this.hasCostAwareResult,
+      rawResultR: rawResultR ?? this.rawResultR,
+      netResultR: netResultR ?? this.netResultR,
+      grossPnl: grossPnl ?? this.grossPnl,
+      netPnl: netPnl ?? this.netPnl,
+      entryFee: entryFee ?? this.entryFee,
+      exitFees: exitFees ?? this.exitFees,
+      spreadCost: spreadCost ?? this.spreadCost,
+      slippageCost: slippageCost ?? this.slippageCost,
+      fundingCost: fundingCost ?? this.fundingCost,
+      simulatedQuantity: simulatedQuantity ?? this.simulatedQuantity,
+      executionModelVersion:
+          executionModelVersion ?? this.executionModelVersion,
+      outcomeFlags: outcomeFlags ?? this.outcomeFlags,
+      qualityFlags: qualityFlags ?? this.qualityFlags,
+      strategyVersion: strategyVersion ?? this.strategyVersion,
+      entryEngineVersion: entryEngineVersion ?? this.entryEngineVersion,
+      stopEngineVersion: stopEngineVersion ?? this.stopEngineVersion,
+      liquidityEngineVersion:
+          liquidityEngineVersion ?? this.liquidityEngineVersion,
       stopTime: stopTime ?? this.stopTime,
       maximumOvershootPrice:
           maximumOvershootPrice ?? this.maximumOvershootPrice,
@@ -464,6 +567,28 @@ class RadarSignal {
       'mfePercent': mfePercent,
       'maePercent': maePercent,
       'resultR': resultR,
+      'hasCostAwareResult': hasCostAwareResult,
+      'rawResultR': rawResultR,
+      'netResultR': netResultR,
+      'grossPnl': grossPnl,
+      'netPnl': netPnl,
+      'entryFee': entryFee,
+      'exitFees': exitFees,
+      'spreadCost': spreadCost,
+      'slippageCost': slippageCost,
+      'fundingCost': fundingCost,
+      'simulatedQuantity': simulatedQuantity,
+      'executionModelVersion': executionModelVersion,
+      'outcomeFlags': outcomeFlags
+          .map<String>((TradeOutcomeFlag flag) => flag.name)
+          .toList(growable: false),
+      'qualityFlags': qualityFlags
+          .map<String>((TradeQualityFlag flag) => flag.name)
+          .toList(growable: false),
+      'strategyVersion': strategyVersion,
+      'entryEngineVersion': entryEngineVersion,
+      'stopEngineVersion': stopEngineVersion,
+      'liquidityEngineVersion': liquidityEngineVersion,
       'stopTime': stopTime?.toIso8601String(),
       'maximumOvershootPrice': maximumOvershootPrice,
       'overshootPoints': overshootPoints,
@@ -578,6 +703,27 @@ class RadarSignal {
       mfePercent: _double(json['mfePercent']),
       maePercent: _double(json['maePercent']),
       resultR: _double(json['resultR']),
+      hasCostAwareResult: _bool(json['hasCostAwareResult']),
+      rawResultR: _double(json['rawResultR']),
+      netResultR: _double(json['netResultR']),
+      grossPnl: _double(json['grossPnl']),
+      netPnl: _double(json['netPnl']),
+      entryFee: _double(json['entryFee']),
+      exitFees: _double(json['exitFees']),
+      spreadCost: _double(json['spreadCost']),
+      slippageCost: _double(json['slippageCost']),
+      fundingCost: _double(json['fundingCost']),
+      simulatedQuantity: _double(json['simulatedQuantity']),
+      executionModelVersion: json['executionModelVersion']?.toString() ?? '',
+      outcomeFlags: _enumList(TradeOutcomeFlag.values, json['outcomeFlags']),
+      qualityFlags: _enumList(TradeQualityFlag.values, json['qualityFlags']),
+      strategyVersion: json['strategyVersion']?.toString() ?? 'STRATEGY_V1',
+      entryEngineVersion:
+          json['entryEngineVersion']?.toString() ?? 'ENTRY_ENGINE_V2',
+      stopEngineVersion:
+          json['stopEngineVersion']?.toString() ?? 'STOP_ENGINE_V2',
+      liquidityEngineVersion:
+          json['liquidityEngineVersion']?.toString() ?? 'LIQUIDITY_ENGINE_V1',
       stopTime: _date(json['stopTime']),
       maximumOvershootPrice: _double(json['maximumOvershootPrice']),
       overshootPoints: _double(json['overshootPoints']),
@@ -651,6 +797,21 @@ List<String> _stringList(Object? raw) {
   return raw
       .map<String>((dynamic value) => value.toString())
       .toList(growable: false);
+}
+
+List<T> _enumList<T extends Enum>(List<T> values, Object? raw) {
+  if (raw is! List) return <T>[];
+  final List<T> result = <T>[];
+  for (final Object? item in raw) {
+    final String name = item?.toString() ?? '';
+    for (final T value in values) {
+      if (value.name == name) {
+        result.add(value);
+        break;
+      }
+    }
+  }
+  return List<T>.unmodifiable(result);
 }
 
 double _clampDouble(double value, double minimum, double maximum) {

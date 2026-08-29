@@ -181,6 +181,14 @@ class BacktestReport {
     required this.averageMovePercent,
     required this.averageTradeMinutes,
     required this.factors,
+    this.rawAverageR = 0.0,
+    this.netAverageR = 0.0,
+    this.rawProfitFactor = 0.0,
+    this.netProfitFactor = 0.0,
+    this.rawMaxDrawdownR = 0.0,
+    this.netMaxDrawdownR = 0.0,
+    this.totalExecutionCosts = 0.0,
+    this.costToGrossPercent = 0.0,
     this.stopThenTp1Percent = 0.0,
     this.stopThenTp2Percent = 0.0,
     this.averageStopOvershootAtr = 0.0,
@@ -207,6 +215,14 @@ class BacktestReport {
   final double stopThenTp2Percent;
   final double averageStopOvershootAtr;
   final List<FactorPerformance> factors;
+  final double rawAverageR;
+  final double netAverageR;
+  final double rawProfitFactor;
+  final double netProfitFactor;
+  final double rawMaxDrawdownR;
+  final double netMaxDrawdownR;
+  final double totalExecutionCosts;
+  final double costToGrossPercent;
   final List<StrategyPerformance> strategies;
   final List<FactorPerformance> reasonCodes;
   final List<ExecutionPerformance> executionComparisons;
@@ -239,30 +255,59 @@ class BacktestReport {
     final List<RadarSignal> stoppedSignals = trades
         .where((RadarSignal signal) => signal.status == SignalStatus.stopped)
         .toList(growable: false);
-    final double grossProfit = finished
+    final double netProfitR = finished
         .where((RadarSignal signal) => signal.resultR > 0.0)
         .fold<double>(0.0, (double sum, RadarSignal signal) {
           return sum + signal.resultR;
         });
-    final double grossLoss = finished
+    final double netLossR = finished
         .where((RadarSignal signal) => signal.resultR < 0.0)
         .fold<double>(0.0, (double sum, RadarSignal signal) {
           return sum + signal.resultR.abs();
         });
 
-    double equity = 0.0;
-    double peak = 0.0;
-    double maxDrawdown = 0.0;
-    for (final RadarSignal signal in finished) {
-      equity += signal.resultR;
-      if (equity > peak) {
-        peak = equity;
-      }
-      final double drawdown = peak - equity;
-      if (drawdown > maxDrawdown) {
-        maxDrawdown = drawdown;
-      }
-    }
+    final List<double> netResults = finished
+        .map<double>((RadarSignal signal) => signal.resultR)
+        .toList(growable: false);
+    final List<double> rawResults = finished
+        .map<double>(
+          (RadarSignal signal) =>
+              signal.hasCostAwareResult ? signal.rawResultR : signal.resultR,
+        )
+        .toList(growable: false);
+    final double rawProfitR = rawResults
+        .where((double result) => result > 0.0)
+        .fold<double>(0.0, (double sum, double result) => sum + result);
+    final double rawLossR = rawResults
+        .where((double result) => result < 0.0)
+        .fold<double>(0.0, (double sum, double result) => sum + result.abs());
+    final double totalExecutionCosts = finished.fold<double>(0.0, (
+      double sum,
+      RadarSignal signal,
+    ) {
+      return sum +
+          signal.entryFee +
+          signal.exitFees +
+          signal.spreadCost +
+          signal.slippageCost +
+          signal.fundingCost;
+    });
+    final double positiveGrossPnl = finished
+        .where((RadarSignal signal) => signal.grossPnl > 0.0)
+        .fold<double>(
+          0.0,
+          (double sum, RadarSignal signal) => sum + signal.grossPnl,
+        );
+    final double rawAverageR = _average(rawResults);
+    final double netAverageR = _average(netResults);
+    final double rawProfitFactor = rawLossR == 0.0
+        ? rawProfitR
+        : rawProfitR / rawLossR;
+    final double netProfitFactor = netLossR == 0.0
+        ? netProfitR
+        : netProfitR / netLossR;
+    final double rawMaxDrawdown = _maxDrawdown(rawResults);
+    final double netMaxDrawdown = _maxDrawdown(netResults);
 
     return BacktestReport(
       symbol: symbol,
@@ -274,11 +319,9 @@ class BacktestReport {
       tp1Percent: _percent(tp1Hits, trades.length),
       tp2Percent: _percent(tp2Hits, trades.length),
       stopPercent: _percent(stops, trades.length),
-      averageR: _average(
-        finished.map<double>((RadarSignal signal) => signal.resultR),
-      ),
-      profitFactor: grossLoss == 0.0 ? grossProfit : grossProfit / grossLoss,
-      maxDrawdownR: maxDrawdown,
+      averageR: netAverageR,
+      profitFactor: netProfitFactor,
+      maxDrawdownR: netMaxDrawdown,
       averageMovePercent: _average(
         trades.map<double>((RadarSignal signal) => signal.mfePercent),
       ),
@@ -287,6 +330,16 @@ class BacktestReport {
           return signal.tradeDuration?.inMinutes.toDouble() ?? 0.0;
         }),
       ),
+      rawAverageR: rawAverageR,
+      netAverageR: netAverageR,
+      rawProfitFactor: rawProfitFactor,
+      netProfitFactor: netProfitFactor,
+      rawMaxDrawdownR: rawMaxDrawdown,
+      netMaxDrawdownR: netMaxDrawdown,
+      totalExecutionCosts: totalExecutionCosts,
+      costToGrossPercent: positiveGrossPnl <= 0.0
+          ? 0.0
+          : totalExecutionCosts / positiveGrossPnl * 100.0,
       stopThenTp1Percent: _percent(
         stoppedSignals.where((RadarSignal signal) => signal.postStopTp1).length,
         stoppedSignals.length,
@@ -320,6 +373,14 @@ class BacktestReport {
     'maxDrawdownR': maxDrawdownR,
     'averageMovePercent': averageMovePercent,
     'averageTradeMinutes': averageTradeMinutes,
+    'rawAverageR': rawAverageR,
+    'netAverageR': netAverageR,
+    'rawProfitFactor': rawProfitFactor,
+    'netProfitFactor': netProfitFactor,
+    'rawMaxDrawdownR': rawMaxDrawdownR,
+    'netMaxDrawdownR': netMaxDrawdownR,
+    'totalExecutionCosts': totalExecutionCosts,
+    'costToGrossPercent': costToGrossPercent,
     'stopThenTp1Percent': stopThenTp1Percent,
     'stopThenTp2Percent': stopThenTp2Percent,
     'averageStopOvershootAtr': averageStopOvershootAtr,
@@ -369,6 +430,26 @@ class BacktestReport {
       maxDrawdownR: _asDouble(json['maxDrawdownR']),
       averageMovePercent: _asDouble(json['averageMovePercent']),
       averageTradeMinutes: _asDouble(json['averageTradeMinutes']),
+      rawAverageR: json.containsKey('rawAverageR')
+          ? _asDouble(json['rawAverageR'])
+          : _asDouble(json['averageR']),
+      netAverageR: json.containsKey('netAverageR')
+          ? _asDouble(json['netAverageR'])
+          : _asDouble(json['averageR']),
+      rawProfitFactor: json.containsKey('rawProfitFactor')
+          ? _asDouble(json['rawProfitFactor'])
+          : _asDouble(json['profitFactor']),
+      netProfitFactor: json.containsKey('netProfitFactor')
+          ? _asDouble(json['netProfitFactor'])
+          : _asDouble(json['profitFactor']),
+      rawMaxDrawdownR: json.containsKey('rawMaxDrawdownR')
+          ? _asDouble(json['rawMaxDrawdownR'])
+          : _asDouble(json['maxDrawdownR']),
+      netMaxDrawdownR: json.containsKey('netMaxDrawdownR')
+          ? _asDouble(json['netMaxDrawdownR'])
+          : _asDouble(json['maxDrawdownR']),
+      totalExecutionCosts: _asDouble(json['totalExecutionCosts']),
+      costToGrossPercent: _asDouble(json['costToGrossPercent']),
       stopThenTp1Percent: _asDouble(json['stopThenTp1Percent']),
       stopThenTp2Percent: _asDouble(json['stopThenTp2Percent']),
       averageStopOvershootAtr: _asDouble(json['averageStopOvershootAtr']),
@@ -735,6 +816,19 @@ double _average(Iterable<double> values) {
     count++;
   }
   return count == 0 ? 0.0 : sum / count;
+}
+
+double _maxDrawdown(Iterable<double> chronologicalResults) {
+  double equity = 0.0;
+  double peak = 0.0;
+  double maximum = 0.0;
+  for (final double result in chronologicalResults) {
+    equity += result;
+    if (equity > peak) peak = equity;
+    final double drawdown = peak - equity;
+    if (drawdown > maximum) maximum = drawdown;
+  }
+  return maximum;
 }
 
 double _percent(int part, int total) {

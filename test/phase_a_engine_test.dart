@@ -4,6 +4,7 @@ import 'package:crypto_radar/engines/phase_a_engine.dart';
 import 'package:crypto_radar/engines/stop_engine.dart';
 import 'package:crypto_radar/engines/trade_tracker.dart';
 import 'package:crypto_radar/models/execution_models.dart';
+import 'package:crypto_radar/models/market_data_models.dart';
 import 'package:crypto_radar/models/market_models.dart';
 import 'package:crypto_radar/models/signal_models.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -96,6 +97,7 @@ void main() {
         bos: Bias.bearish,
       ),
       falseBreakout: FalseBreakoutAnalysis.none,
+      tradingRules: _rules,
     );
 
     expect(result.invalidationPrice, greaterThan(signal.entryPrice));
@@ -115,6 +117,7 @@ void main() {
       signal: signal,
       analysis: _analysis(candles: _trendCandles(start), trend: Bias.bearish),
       falseBreakout: FalseBreakoutAnalysis.none,
+      tradingRules: _rules,
     );
 
     expect(result.safe, isFalse);
@@ -334,8 +337,20 @@ MarketSnapshot _market(
       reason: 'test',
     ),
     updatedAt: start,
+    tradingRules: _rules,
   );
 }
+
+const InstrumentTradingRules _rules = InstrumentTradingRules(
+  symbol: 'BTCUSDT',
+  venue: ExchangeVenue.bybit,
+  tickSize: 0.01,
+  quantityStep: 0.001,
+  minOrderQuantity: 0.001,
+  minNotional: 5.0,
+  maxLeverage: 100.0,
+  leverageStep: 0.01,
+);
 
 TimeframeAnalysis _analysis({
   required List<Candle> candles,

@@ -225,6 +225,80 @@ class _TradingRiskSettings extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
+          strings.pick('Риск всего счёта', 'Account risk'),
+          style: Theme.of(context).textTheme.titleSmall
+              ?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: <Widget>[
+            SizedBox(
+              width: 210,
+              child: TextFormField(
+                key: ValueKey<String>(
+                  'account-equity-${preferences.accountEquity}',
+                ),
+                initialValue: preferences.accountEquity <= 0.0
+                    ? ''
+                    : preferences.accountEquity.toStringAsFixed(2),
+                decoration: InputDecoration(
+                  labelText: strings.pick('Размер счёта', 'Account equity'),
+                  suffixText: 'USDT',
+                  hintText: strings.pick('Не настроено', 'Not configured'),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                onFieldSubmitted: (String value) {
+                  final double? parsed = _parseNumber(value);
+                  if (parsed != null) preferences.setAccountEquity(parsed);
+                },
+              ),
+            ),
+            SizedBox(
+              width: 210,
+              child: TextFormField(
+                key: ValueKey<String>(
+                  'account-risk-${preferences.accountRiskPercent}',
+                ),
+                initialValue: preferences.accountRiskPercent.toStringAsFixed(2),
+                decoration: InputDecoration(
+                  labelText: strings.pick(
+                    'Риск счёта на сделку',
+                    'Account risk per trade',
+                  ),
+                  suffixText: '%',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                onFieldSubmitted: (String value) {
+                  final double? parsed = _parseNumber(value);
+                  if (parsed != null) {
+                    preferences.setAccountRiskPercent(parsed);
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          preferences.accountEquity > 0.0
+              ? strings.pick(
+                  'Account Risk Gate активен. Максимум по умолчанию: ${_money(preferences.accountEquity * preferences.accountRiskPercent / 100.0)} на сделку.',
+                  'Account Risk Gate is active. Current maximum: ${_money(preferences.accountEquity * preferences.accountRiskPercent / 100.0)} per trade.',
+                )
+              : strings.pick(
+                  'Укажите размер счёта, чтобы включить проверку общего риска. До этого калькулятор проверяет только риск выделенной маржи.',
+                  'Set account equity to enable total-account risk checks. Until then only allocated-margin risk is checked.',
+                ),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const Divider(height: 28),
+        Text(
           strings.pick('Стандартный риск', 'Default risk'),
           style: Theme.of(context).textTheme.titleSmall
               ?.copyWith(fontWeight: FontWeight.w800),

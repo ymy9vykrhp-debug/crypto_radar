@@ -1,5 +1,6 @@
 import '../models/decision_models.dart';
 import '../models/execution_models.dart';
+import '../models/market_data_models.dart';
 import '../models/market_models.dart';
 import '../models/signal_models.dart';
 
@@ -401,6 +402,13 @@ class DecisionEngine {
   }
 
   static DataQuality _dataQuality(MarketSnapshot market) {
+    if (market.dataIntegrity.checkedAt != null) {
+      return switch (market.dataIntegrity.level) {
+        MarketDataQualityLevel.high => DataQuality.high,
+        MarketDataQualityLevel.medium => DataQuality.medium,
+        MarketDataQualityLevel.low => DataQuality.low,
+      };
+    }
     final int minimum = <int>[
       market.oneMinute.candles.length,
       market.fiveMinutes.candles.length,

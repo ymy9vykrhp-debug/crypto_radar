@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../engines/position_calculator.dart';
 import '../localization/app_strings.dart';
+import '../models/account_risk_models.dart';
 import '../models/decision_models.dart';
 import '../models/execution_models.dart';
 import '../models/position_calculator_models.dart';
@@ -89,6 +90,14 @@ class _SmartPositionCalculatorDialogState
       targetMovePercent: _parse(_targetMove.text),
       personalMaxLeverage: widget.preferences.personalMaxLeverage,
       highRiskLeverageEnabled: widget.preferences.highRiskLeverageEnabled,
+      accountRiskPolicy: widget.preferences.accountEquity > 0.0
+          ? AccountRiskPolicy(
+              accountEquity: widget.preferences.accountEquity,
+              accountRiskPercent: widget.preferences.accountRiskPercent,
+              personalMaxLeverage: widget.preferences.personalMaxLeverage,
+              highRiskOverride: widget.preferences.highRiskLeverageEnabled,
+            )
+          : null,
     );
   }
 
@@ -500,6 +509,21 @@ class _SmartPositionCalculatorDialogState
             label: strings.pick('Лимит риска', 'Risk limit'),
             value: _money(plan.maxLoss),
           ),
+          if (plan.accountRiskDecision != null) ...<Widget>[
+            const Divider(height: 18),
+            _InfoLine(
+              label: 'Account Risk Gate',
+              value: plan.accountRiskDecision!.status.name.toUpperCase(),
+              emphasized: true,
+            ),
+            _InfoLine(
+              label: strings.pick(
+                'Лимит от всего счёта',
+                'Whole-account limit',
+              ),
+              value: _money(plan.accountRiskDecision!.allowedRiskAmount),
+            ),
+          ],
         ],
       ),
     );

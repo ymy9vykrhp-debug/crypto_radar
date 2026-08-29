@@ -1,8 +1,10 @@
+import '../models/account_risk_models.dart';
 import '../models/decision_models.dart';
 import '../models/execution_models.dart';
 import '../models/position_calculator_models.dart';
 import '../models/signal_models.dart';
 import 'exchange_decimal.dart';
+import 'account_risk_engine.dart';
 import 'leverage_safety.dart';
 
 class PositionCalculator {
@@ -116,6 +118,23 @@ class PositionCalculator {
         'Даже позиция 1x превышает заданный риск при текущем структурном Stop.',
       );
       leverage = 0;
+    }
+    final AccountRiskDecision? accountRiskDecision =
+        input.accountRiskPolicy == null
+        ? null
+        : AccountRiskEngine.evaluate(
+            policy: input.accountRiskPolicy!,
+            state: input.accountRiskState,
+            requestedRiskAmount: maxLoss,
+            proposedLeverage: leverage,
+            safetyLeverage: leverageSafety.safeLeverage,
+          );
+    if (accountRiskDecision?.status == AccountRiskStatus.blocked) {
+      _addIssue(
+        issues,
+        TradeValidationCode.accountRiskBlocked,
+        'Account Risk Gate заблокировал сделку: ${accountRiskDecision!.reasonCodes.join(', ')}.',
+      );
     }
 
     final double requestedNotional = leverage <= 0
@@ -263,6 +282,8 @@ class PositionCalculator {
         'Расчёт готов, но Decision Engine ещё не подтвердил вход.',
       if (leverageSafety.calculatedLeverage > leverageSafety.safetyLimit)
         'Математическое плечо снижено Safety Gate.',
+      if (accountRiskDecision?.status == AccountRiskStatus.wait)
+        'Account Risk Gate требует паузу: ${accountRiskDecision!.reasonCodes.join(', ')}.',
     ];
     final List<String> explanation = _explanation(
       input: input,
@@ -306,6 +327,7 @@ class PositionCalculator {
       validationIssues: List<TradeValidationIssue>.unmodifiable(issues),
       maxNotionalByRisk: maxNotionalByRisk,
       effectiveLossPercent: effectiveLossPercent,
+      accountRiskDecision: accountRiskDecision,
     );
   }
 

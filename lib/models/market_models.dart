@@ -1,3 +1,5 @@
+import 'market_data_models.dart';
+
 // Extracted from the verified working radar.
 enum Bias { bullish, bearish, neutral }
 
@@ -81,6 +83,8 @@ class TickerStats {
     this.openInterest = 0.0,
     this.openInterestValue = 0.0,
     this.orderBookUpdatedAt,
+    this.sourceUpdatedAt,
+    this.fundingUpdatedAt,
   });
 
   final double price;
@@ -94,6 +98,8 @@ class TickerStats {
   final double openInterest;
   final double openInterestValue;
   final DateTime? orderBookUpdatedAt;
+  final DateTime? sourceUpdatedAt;
+  final DateTime? fundingUpdatedAt;
 
   double get spread {
     if (bidPrice <= 0 || askPrice <= 0 || askPrice < bidPrice) return 0.0;
@@ -106,6 +112,36 @@ class TickerStats {
   }
 
   bool get hasMicrostructure => bidPrice > 0 && askPrice > 0;
+
+  DateTime? get bidAskUpdatedAt => orderBookUpdatedAt ?? sourceUpdatedAt;
+
+  bool hasFreshBidAskAt(
+    DateTime now, {
+    Duration maximumAge = const Duration(seconds: 30),
+  }) {
+    final DateTime? updatedAt = bidAskUpdatedAt;
+    if (!hasMicrostructure || updatedAt == null) return false;
+    final Duration age = now.toUtc().difference(updatedAt.toUtc());
+    return !age.isNegative && age <= maximumAge;
+  }
+
+  TickerStats copyWith({double? price}) {
+    return TickerStats(
+      price: price ?? this.price,
+      change24hPercent: change24hPercent,
+      turnover24h: turnover24h,
+      bidPrice: bidPrice,
+      askPrice: askPrice,
+      markPrice: markPrice,
+      indexPrice: indexPrice,
+      fundingRatePercent: fundingRatePercent,
+      openInterest: openInterest,
+      openInterestValue: openInterestValue,
+      orderBookUpdatedAt: orderBookUpdatedAt,
+      sourceUpdatedAt: sourceUpdatedAt,
+      fundingUpdatedAt: fundingUpdatedAt,
+    );
+  }
 }
 
 class MacdResult {
@@ -284,6 +320,8 @@ class MarketSnapshot {
     required this.expectedHigh,
     required this.tradePlan,
     required this.updatedAt,
+    this.tradingRules,
+    this.dataIntegrity = const MarketDataIntegrity.unavailable(),
   });
 
   final String symbol;
@@ -304,4 +342,6 @@ class MarketSnapshot {
   final double expectedHigh;
   final TradePlan tradePlan;
   final DateTime updatedAt;
+  final InstrumentTradingRules? tradingRules;
+  final MarketDataIntegrity dataIntegrity;
 }

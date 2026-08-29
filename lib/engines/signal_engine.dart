@@ -1,5 +1,7 @@
+import '../models/market_data_models.dart';
 import '../models/market_models.dart';
 import '../models/signal_models.dart';
+import 'market_data_integrity_engine.dart';
 
 class SignalEngine {
   const SignalEngine._();
@@ -11,7 +13,11 @@ class SignalEngine {
     required List<Candle> fiveCandles,
     required List<Candle> fifteenCandles,
     required List<Candle> hourCandles,
+    InstrumentTradingRules? tradingRules,
+    DateTime? observedAt,
+    bool requireFreshBidAsk = true,
   }) {
+    final DateTime snapshotTime = (observedAt ?? DateTime.now()).toUtc();
     final TimeframeAnalysis one = _analyzeTimeframe('1м', oneCandles);
     final TimeframeAnalysis five = _analyzeTimeframe('5м', fiveCandles);
     final TimeframeAnalysis fifteen = _analyzeTimeframe('15м', fifteenCandles);
@@ -56,16 +62,24 @@ class SignalEngine {
     final TradePlan tradePlan = _createTradePlan(
       analysis: fifteen,
       bias: planBias,
-      strength: strength,
+    );
+    final TickerStats preservedTicker = ticker.copyWith(price: price);
+    final MarketDataIntegrity dataIntegrity = MarketDataIntegrityEngine.assess(
+      ticker: preservedTicker,
+      candlesByTimeframe: <Duration, List<Candle>>{
+        const Duration(minutes: 1): oneCandles,
+        const Duration(minutes: 5): fiveCandles,
+        const Duration(minutes: 15): fifteenCandles,
+        const Duration(hours: 1): hourCandles,
+      },
+      tradingRules: tradingRules,
+      checkedAt: snapshotTime,
+      requireFreshBidAsk: requireFreshBidAsk,
     );
 
     return MarketSnapshot(
       symbol: symbol,
-      ticker: TickerStats(
-        price: price,
-        change24hPercent: ticker.change24hPercent,
-        turnover24h: ticker.turnover24h,
-      ),
+      ticker: preservedTicker,
       oneMinute: one,
       fiveMinutes: five,
       fifteenMinutes: fifteen,
@@ -81,7 +95,9 @@ class SignalEngine {
       expectedLow: price - expectedDistance,
       expectedHigh: price + expectedDistance,
       tradePlan: tradePlan,
-      updatedAt: DateTime.now(),
+      updatedAt: snapshotTime,
+      tradingRules: tradingRules,
+      dataIntegrity: dataIntegrity,
     );
   }
 
@@ -224,16 +240,6 @@ class SignalEngine {
     final String id =
         '${snapshot.symbol}:scalp:${direction.name}:'
         '${time.toUtc().millisecondsSinceEpoch}';
-    final double volatilityPercent = price == 0.0
-        ? 0.0
-        : one.atr / price * 100.0;
-    final int leverage = score >= 90 && volatilityPercent <= 0.25
-        ? 10
-        : score >= 85
-        ? 8
-        : score >= 80
-        ? 6
-        : 4;
 
     return RadarSignal(
       id: id,
@@ -264,7 +270,9 @@ class SignalEngine {
       liquidityBias: liquidityBias,
       bos: one.structure.bos,
       choch: one.structure.choch,
-      leverage: leverage,
+      // SignalEngine describes the setup only. Final leverage belongs to the
+      // Position/Account Risk layer after structural Stop validation.
+      leverage: 1,
       lastTrackedCandleTime: one.candles.last.time,
     );
   }
@@ -924,24 +932,9 @@ class SignalEngine {
   static TradePlan _createTradePlan({
     required TimeframeAnalysis analysis,
     required Bias bias,
-    required int strength,
   }) {
     final double atr = analysis.atr;
     final double price = analysis.price;
-    final double atrPercent = price == 0.0 ? 0.0 : atr / price * 100.0;
-    int leverage;
-    if (atrPercent >= 3.0) {
-      leverage = 2;
-    } else if (atrPercent >= 1.5) {
-      leverage = 3;
-    } else if (atrPercent >= 0.8) {
-      leverage = 5;
-    } else {
-      leverage = 7;
-    }
-    if (strength < 65 && leverage > 3) {
-      leverage = 3;
-    }
 
     if (bias == Bias.bullish) {
       final double entryLow = price - atr * 0.25;
@@ -955,7 +948,7 @@ class SignalEngine {
         stop: stop,
         tp1: entryHigh + risk * 1.5,
         tp2: entryHigh + risk * 2.5,
-        leverage: leverage,
+        leverage: 1,
         reason: 'Вход после удержания зоны и бычьего подтверждения 5м.',
       );
     }
@@ -970,7 +963,7 @@ class SignalEngine {
       stop: stop,
       tp1: entryLow - risk * 1.5,
       tp2: entryLow - risk * 2.5,
-      leverage: leverage,
+      leverage: 1,
       reason: 'Вход после отклонения зоны и медвежьего подтверждения 5м.',
     );
   }
