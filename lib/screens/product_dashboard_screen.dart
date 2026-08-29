@@ -86,8 +86,6 @@ class ProductDashboardScreen extends StatelessWidget {
               onCalculateTrade: onCalculateTrade,
             ),
             const SizedBox(height: 14),
-            _FocusLegend(strings: strings),
-            const SizedBox(height: 10),
             LayoutBuilder(
               builder: (BuildContext context, BoxConstraints constraints) {
                 final int columns = constraints.maxWidth >= 1180
