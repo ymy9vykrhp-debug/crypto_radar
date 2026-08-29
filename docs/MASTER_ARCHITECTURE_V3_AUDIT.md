@@ -140,6 +140,7 @@ compiler failure.
 
 - `flutter analyze`: **PASS — No issues found**.
 - `flutter test`: **PASS — 105 tests**.
+- `flutter build web`: **PASS** (`build/web` created successfully).
 - Tests cover no-lookahead windows, conservative stop-before-target ordering,
   market integrity, decimal/exchange rounding, fees/slippage, long/short,
   account risk, journal serialization/statistics, chart behavior and UI shell.
@@ -147,8 +148,8 @@ compiler failure.
   Telegram payload/relay formatting, multi-source staleness, long-running
   reconnect, storage corruption surfaced to UI, and 24/7 process recovery.
 - Chrome visual run: **NOT VERIFIED in this audit** because the managed Chrome
-  connection is unavailable. Analyzer and widget tests are not presented as a
-  substitute for visual inspection.
+  connection is unavailable. The successful web build and widget tests are not
+  presented as a substitute for visual inspection.
 
 ## 8. GIT STATUS
 
