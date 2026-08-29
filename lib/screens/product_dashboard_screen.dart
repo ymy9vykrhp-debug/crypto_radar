@@ -340,7 +340,7 @@ class ProductDashboardScreen extends StatelessWidget {
   }) {
     return SizedBox(
       width: width,
-      height: 105,
+      height: 88,
       child: ProductMetricCard(
         label: label,
         value: value,
