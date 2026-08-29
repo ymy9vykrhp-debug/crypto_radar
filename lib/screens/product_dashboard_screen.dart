@@ -66,7 +66,7 @@ class ProductDashboardScreen extends StatelessWidget {
           symbolSignals,
         );
         return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
           children: <Widget>[
             _DecisionHero(
               snapshot: snapshot,
