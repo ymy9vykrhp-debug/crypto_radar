@@ -97,8 +97,8 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 subtitle: Text(
                   strings.pick(
-                    'Только сильный новый ENTRY_CONFIRMED · MONITOR ONLY',
-                    'Strong new ENTRY_CONFIRMED only · MONITOR ONLY',
+                    '«ВХОД РАЗРЕШЁН» после полного Safety Gate · без ордеров',
+                    'ENTRY READY after the full Safety Gate · no orders',
                   ),
                 ),
                 trailing: ProductStatusChip(

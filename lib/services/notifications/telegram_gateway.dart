@@ -101,8 +101,8 @@ class HttpTelegramRelayGateway implements TelegramGateway {
     final signal = alert.signal;
     final String direction = signal.direction.name.toUpperCase();
     return _send(config, <String, Object?>{
-      'eventId': signal.id,
-      'kind': 'ENTRY_CONFIRMED',
+      'eventId': 'entry-ready:${signal.id}',
+      'kind': 'ENTRY_READY',
       'symbol': signal.symbol,
       'direction': direction,
       'score': signal.score,
@@ -112,7 +112,8 @@ class HttpTelegramRelayGateway implements TelegramGateway {
       'tp1': signal.tp1,
       'tp2': signal.tp2,
       'createdAt': alert.createdAt.toUtc().toIso8601String(),
-      'text': '${signal.symbol} · $direction · score ${signal.score}',
+      'riskReward': alert.riskReward,
+      'text': '🔔 ВХОД РАЗРЕШЁН · ${signal.symbol} · $direction',
     });
   }
 

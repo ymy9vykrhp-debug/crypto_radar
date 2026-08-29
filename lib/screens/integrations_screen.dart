@@ -100,8 +100,8 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
                       ),
                       subtitle: Text(
                         strings.pick(
-                          'Только новые ENTRY_CONFIRMED, прошедшие текущий фильтр силы.',
-                          'Only new ENTRY_CONFIRMED events passing the strength gate.',
+                          'Только новый «ВХОД РАЗРЕШЁН» после проверки данных, зоны, ликвидности, Stop и риска.',
+                          'Only a new ENTRY READY event after data, zone, liquidity, stop, and risk checks.',
                         ),
                       ),
                       value: config.enabled,

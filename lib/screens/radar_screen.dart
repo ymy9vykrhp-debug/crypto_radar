@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../engines/backtest_engine.dart';
 import '../engines/decision_engine.dart';
+import '../engines/entry_readiness_gate.dart';
 import '../engines/phase_a_engine.dart';
 import '../engines/signal_engine.dart';
 import '../localization/app_strings.dart';
@@ -147,10 +148,16 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
       await _journalController.processLiveSnapshot(result);
       if (!mounted) return;
       setState(() => _snapshot = result);
+      final DecisionSnapshot decision = _decisionFor(result);
+      final EntryReadinessResult readiness = EntryReadinessGate.evaluate(
+        market: result,
+        decision: decision,
+      );
       final TradeAlert? alert = _tradeAlertController.evaluate(
         _journalController.signals.where(
           (RadarSignal signal) => signal.symbol == result.symbol,
         ),
+        readiness: readiness,
       );
       if (alert != null) {
         WidgetsBinding.instance.addPostFrameCallback(
@@ -325,6 +332,10 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
   DecisionSnapshot? _currentDecision() {
     final MarketSnapshot? snapshot = _snapshot;
     if (snapshot == null) return null;
+    return _decisionFor(snapshot);
+  }
+
+  DecisionSnapshot _decisionFor(MarketSnapshot snapshot) {
     final RadarSignal? rawSignal = SignalEngine.createSignal(snapshot);
     final RadarSignal? executionSignal = rawSignal == null
         ? null

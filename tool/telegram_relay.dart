@@ -223,12 +223,13 @@ class _TelegramRelay {
     final String symbol = payload['symbol']?.toString() ?? 'UNKNOWN';
     final String direction = payload['direction']?.toString() ?? 'WAIT';
     return <String>[
-      'Crypto Radar · ENTRY CONFIRMED',
-      '$symbol · $direction · score ${payload['score'] ?? '—'}',
+      '🔔 Crypto Radar · ВХОД РАЗРЕШЁН',
+      '$symbol · $direction · сила ${payload['score'] ?? '—'}/100',
       'Entry: ${payload['entryLow'] ?? '—'} – ${payload['entryHigh'] ?? '—'}',
       'Stop: ${payload['stop'] ?? '—'}',
       'TP1: ${payload['tp1'] ?? '—'} · TP2: ${payload['tp2'] ?? '—'}',
-      'MONITOR ONLY · order was not placed',
+      'R:R: ${payload['riskReward'] ?? '—'}',
+      'Только уведомление · ордер НЕ отправлен',
     ].join('\n');
   }
 

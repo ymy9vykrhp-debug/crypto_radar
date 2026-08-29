@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../engines/decision_engine.dart';
+import '../engines/entry_readiness_gate.dart';
 import '../engines/phase_a_engine.dart';
 import '../engines/signal_engine.dart';
 import '../localization/app_strings.dart';
@@ -506,30 +507,16 @@ class _ActionAndPlan extends StatelessWidget {
     final Color focusColor = Theme.of(context).colorScheme.primary;
     final RadarSemanticColors semantic = Theme.of(context)
         .extension<RadarSemanticColors>()!;
-    final bool hardBlocked =
-        decision.dataQuality == DataQuality.low ||
-        snapshot.dataIntegrity.hasCriticalIssue ||
-        decision.executionAction.toUpperCase().contains('NO TRADE');
-    final bool entryConfirmed =
-        decision.signalStage == SignalStage.entryConfirmed ||
-        decision.signalStage == SignalStage.inPosition ||
-        decision.signalStage == SignalStage.tp1Hit ||
-        decision.signalStage == SignalStage.tp2Hit;
-    final bool entryReady =
-        !hardBlocked &&
-        entryConfirmed &&
-        decision.entryDecision == EntryDecision.enterNow &&
-        decision.qualityScores.risk >= 70;
-    final bool priceInZone =
-        decision.entryLow > 0 &&
-        decision.entryHigh >= decision.entryLow &&
-        decision.price >= decision.entryLow &&
-        decision.price <= decision.entryHigh;
-    final bool liquidityReady =
-        decision.qualityScores.liquidity >= 70 ||
-        decision.liquiditySweepConfirmed;
-    final bool riskReady =
-        decision.qualityScores.stop >= 70 && decision.qualityScores.risk >= 70;
+    final EntryReadinessResult readiness = EntryReadinessGate.evaluate(
+      market: snapshot,
+      decision: decision,
+    );
+    final bool hardBlocked = readiness.hardBlocked;
+    final bool entryConfirmed = readiness.entryConfirmed;
+    final bool entryReady = readiness.entryReady;
+    final bool priceInZone = readiness.priceInZone;
+    final bool liquidityReady = readiness.liquidityReady;
+    final bool riskReady = readiness.riskReady;
     final Color actionColor = hardBlocked
         ? semantic.bearish
         : entryReady
@@ -553,9 +540,7 @@ class _ActionAndPlan extends StatelessWidget {
       _DecisionCheck(
         label: strings.pick('Рыночные данные', 'Market data'),
         detail: '${decision.dataQuality.label} · $dataAge',
-        passed:
-            decision.dataQuality != DataQuality.low &&
-            !snapshot.dataIntegrity.hasCriticalIssue,
+        passed: readiness.marketDataReady,
         critical: true,
       ),
       _DecisionCheck(
@@ -563,9 +548,7 @@ class _ActionAndPlan extends StatelessWidget {
         detail:
             '${snapshot.dataIntegrity.hasFreshBidAsk ? 'Bid/Ask OK' : 'Bid/Ask STALE'} · '
             '${snapshot.dataIntegrity.hasInstrumentRules ? 'RULES OK' : 'RULES MISSING'}',
-        passed:
-            snapshot.dataIntegrity.hasFreshBidAsk &&
-            snapshot.dataIntegrity.hasInstrumentRules,
+        passed: readiness.microstructureReady,
         critical: true,
       ),
       _DecisionCheck(

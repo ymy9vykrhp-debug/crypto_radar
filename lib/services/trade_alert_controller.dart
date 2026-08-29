@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../engines/entry_readiness_gate.dart';
 import '../models/execution_models.dart';
 import '../models/signal_models.dart';
 import '../models/trade_alert_models.dart';
@@ -32,7 +33,10 @@ class TradeAlertController extends ChangeNotifier {
     }
   }
 
-  TradeAlert? evaluate(Iterable<RadarSignal> signals) {
+  TradeAlert? evaluate(
+    Iterable<RadarSignal> signals, {
+    EntryReadinessResult? readiness,
+  }) {
     final List<RadarSignal> ordered = signals.toList(growable: false)
       ..sort((RadarSignal a, RadarSignal b) {
         final DateTime first = a.entryConfirmedTime ?? a.time;
@@ -46,6 +50,7 @@ class TradeAlertController extends ChangeNotifier {
       if (alert != null ||
           signal.stage != SignalStage.entryConfirmed ||
           previous == SignalStage.entryConfirmed ||
+          (readiness != null && !readiness.entryReady) ||
           !_isStrong(signal) ||
           !_cooldownAllows(signal)) {
         continue;
