@@ -56,6 +56,7 @@ class ProductMetricCard extends StatelessWidget {
     this.color,
     this.caption,
     this.emphasis = false,
+    this.focusHighlight = false,
   });
 
   final String label;
@@ -64,55 +65,89 @@ class ProductMetricCard extends StatelessWidget {
   final Color? color;
   final String? caption;
   final bool emphasis;
+  final bool focusHighlight;
 
   @override
   Widget build(BuildContext context) {
     final Color effective = color ?? Theme.of(context).colorScheme.primary;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                if (icon != null) ...<Widget>[
-                  Icon(icon, size: 17, color: effective),
-                  const SizedBox(width: 7),
-                ],
-                Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    final Color focusColor = Theme.of(context).colorScheme.primary;
+    final RoundedRectangleBorder? focusShape = focusHighlight
+        ? RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: focusColor, width: 2.2),
+          )
+        : null;
+    return Semantics(
+      label: focusHighlight ? '$label. Important decision metric.' : label,
+      child: Card(
+        color: focusHighlight
+            ? Color.alphaBlend(
+                focusColor.withValues(alpha: 0.07),
+                Theme.of(context).colorScheme.surface,
+              )
+            : null,
+        elevation: focusHighlight ? 4 : 0,
+        shadowColor: focusHighlight ? focusColor.withValues(alpha: 0.55) : null,
+        shape: focusShape,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  if (icon != null) ...<Widget>[
+                    Icon(icon, size: 17, color: effective),
+                    const SizedBox(width: 7),
+                  ],
+                  Expanded(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontWeight: focusHighlight
+                            ? FontWeight.w800
+                            : FontWeight.normal,
+                      ),
                     ),
                   ),
+                  if (focusHighlight) ...<Widget>[
+                    const SizedBox(width: 6),
+                    Icon(
+                      Icons.center_focus_strong_rounded,
+                      size: 16,
+                      color: focusColor,
+                    ),
+                  ],
+                ],
+              ),
+              const Spacer(),
+              Text(
+                value,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style:
+                    (emphasis
+                            ? Theme.of(context).textTheme.headlineSmall
+                            : Theme.of(context).textTheme.titleMedium)
+                        ?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          color: effective,
+                        ),
+              ),
+              if (caption != null) ...<Widget>[
+                const SizedBox(height: 4),
+                Text(
+                  caption!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
-            ),
-            const Spacer(),
-            Text(
-              value,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style:
-                  (emphasis
-                          ? Theme.of(context).textTheme.headlineSmall
-                          : Theme.of(context).textTheme.titleMedium)
-                      ?.copyWith(fontWeight: FontWeight.w900, color: effective),
-            ),
-            if (caption != null) ...<Widget>[
-              const SizedBox(height: 4),
-              Text(
-                caption!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
             ],
-          ],
+          ),
         ),
       ),
     );

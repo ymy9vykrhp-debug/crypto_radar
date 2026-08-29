@@ -81,6 +81,8 @@ class ProductDashboardScreen extends StatelessWidget {
               onCalculateTrade: onCalculateTrade,
             ),
             const SizedBox(height: 14),
+            _FocusLegend(strings: strings),
+            const SizedBox(height: 10),
             LayoutBuilder(
               builder: (BuildContext context, BoxConstraints constraints) {
                 final int columns = constraints.maxWidth >= 1180
@@ -100,6 +102,7 @@ class ProductDashboardScreen extends StatelessWidget {
                       decision.signalStage.code,
                       Icons.flag_outlined,
                       decisionColor,
+                      focusHighlight: true,
                     ),
                     _metric(
                       width,
@@ -121,6 +124,7 @@ class ProductDashboardScreen extends StatelessWidget {
                       '${decision.qualityScores.entry}/100',
                       Icons.login_rounded,
                       decisionColor,
+                      focusHighlight: true,
                     ),
                     _metric(
                       width,
@@ -128,6 +132,7 @@ class ProductDashboardScreen extends StatelessWidget {
                       '${decision.qualityScores.location}/100',
                       Icons.location_on_outlined,
                       decisionColor,
+                      focusHighlight: true,
                     ),
                     _metric(
                       width,
@@ -138,6 +143,7 @@ class ProductDashboardScreen extends StatelessWidget {
                       '${decision.qualityScores.liquidity}/100',
                       Icons.water_drop_outlined,
                       decisionColor,
+                      focusHighlight: true,
                     ),
                     _metric(
                       width,
@@ -147,6 +153,7 @@ class ProductDashboardScreen extends StatelessWidget {
                       decision.stopBuffer > 0
                           ? semantic.warning
                           : semantic.neutral,
+                      focusHighlight: true,
                     ),
                     _metric(
                       width,
@@ -163,6 +170,7 @@ class ProductDashboardScreen extends StatelessWidget {
                       decision.qualityScores.risk >= 70
                           ? semantic.bullish
                           : semantic.warning,
+                      focusHighlight: true,
                     ),
                     _metric(
                       width,
@@ -179,6 +187,7 @@ class ProductDashboardScreen extends StatelessWidget {
                       decision.dataQuality == DataQuality.high
                           ? semantic.bullish
                           : semantic.warning,
+                      focusHighlight: true,
                     ),
                     _metric(
                       width,
@@ -235,6 +244,7 @@ class ProductDashboardScreen extends StatelessWidget {
                       '15m BOS ${snapshot.fifteenMinutes.structure.bos.label}',
                       '15m CHOCH ${snapshot.fifteenMinutes.structure.choch.label}',
                     ],
+                    focusHighlight: true,
                   ),
                   _CompactSummary(
                     title: strings.pick('Тяжёлый уровень', 'Heavy Level'),
@@ -244,6 +254,7 @@ class ProductDashboardScreen extends StatelessWidget {
                       '${strings.pick('Поддержка', 'Support')}: ${_nullablePrice(snapshot.fifteenMinutes.support)}',
                       '${strings.pick('Сопротивление', 'Resistance')}: ${_nullablePrice(snapshot.fifteenMinutes.resistance)}',
                     ],
+                    focusHighlight: true,
                   ),
                   _CompactSummary(
                     title: strings.pick('Текущий сетап', 'Current Setup'),
@@ -258,6 +269,7 @@ class ProductDashboardScreen extends StatelessWidget {
                           : decision.executionAction,
                       'R:R ${decision.riskReward.toStringAsFixed(2)}',
                     ],
+                    focusHighlight: true,
                   ),
                   _CompactSummary(
                     title: strings.pick('Новости', 'News'),
@@ -318,8 +330,9 @@ class ProductDashboardScreen extends StatelessWidget {
     String label,
     String value,
     IconData icon,
-    Color color,
-  ) {
+    Color color, {
+    bool focusHighlight = false,
+  }) {
     return SizedBox(
       width: width,
       height: 105,
@@ -328,6 +341,42 @@ class ProductDashboardScreen extends StatelessWidget {
         value: value,
         icon: icon,
         color: color,
+        focusHighlight: focusHighlight,
+      ),
+    );
+  }
+}
+
+class _FocusLegend extends StatelessWidget {
+  const _FocusLegend({required this.strings});
+
+  final AppStrings strings;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color color = Theme.of(context).colorScheme.primary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.7), width: 1.4),
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(Icons.center_focus_strong_rounded, size: 18, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              strings.pick(
+                'Яркая зелёная рамка — главный показатель для решения. Цвет числа показывает его реальное качество.',
+                'A bright green border marks a key decision metric. The number color still shows its real quality.',
+              ),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -446,7 +495,18 @@ class _ActionAndPlan extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final Color focusColor = Theme.of(context).colorScheme.primary;
     return Card(
+      color: Color.alphaBlend(
+        focusColor.withValues(alpha: 0.07),
+        Theme.of(context).colorScheme.surface,
+      ),
+      elevation: 4,
+      shadowColor: focusColor.withValues(alpha: 0.55),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: focusColor, width: 2.2),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -551,15 +611,32 @@ class _CompactSummary extends StatelessWidget {
     required this.title,
     required this.icon,
     required this.lines,
+    this.focusHighlight = false,
   });
 
   final String title;
   final IconData icon;
   final List<String> lines;
+  final bool focusHighlight;
 
   @override
   Widget build(BuildContext context) {
+    final Color focusColor = Theme.of(context).colorScheme.primary;
     return Card(
+      color: focusHighlight
+          ? Color.alphaBlend(
+              focusColor.withValues(alpha: 0.07),
+              Theme.of(context).colorScheme.surface,
+            )
+          : null,
+      elevation: focusHighlight ? 4 : 0,
+      shadowColor: focusHighlight ? focusColor.withValues(alpha: 0.55) : null,
+      shape: focusHighlight
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(color: focusColor, width: 2.2),
+            )
+          : null,
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
