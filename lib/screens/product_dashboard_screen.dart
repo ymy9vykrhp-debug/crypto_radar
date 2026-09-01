@@ -1,14 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../engines/decision_engine.dart';
 import '../engines/entry_readiness_gate.dart';
-import '../engines/phase_a_engine.dart';
-import '../engines/signal_engine.dart';
 import '../localization/app_strings.dart';
 import '../models/backtest_models.dart';
 import '../models/decision_models.dart';
 import '../models/execution_models.dart';
+import '../models/integration_models.dart';
 import '../models/live_market_models.dart';
 import '../models/market_models.dart';
 import '../models/navigation_models.dart';
@@ -21,33 +19,33 @@ class ProductDashboardScreen extends StatelessWidget {
   const ProductDashboardScreen({
     super.key,
     required this.snapshot,
+    required this.decision,
+    required this.readiness,
     required this.journalController,
     required this.onWhy,
     required this.onOpenWorkspace,
     required this.onCalculateTrade,
     this.onRefresh,
     this.livePrice,
+    this.notificationStatus,
+    this.notificationsEnabled = false,
   });
 
   final MarketSnapshot snapshot;
+  final DecisionSnapshot decision;
+  final EntryReadinessResult readiness;
   final JournalController journalController;
   final VoidCallback onWhy;
   final VoidCallback onOpenWorkspace;
   final VoidCallback onCalculateTrade;
   final VoidCallback? onRefresh;
   final ValueListenable<LivePriceTick?>? livePrice;
+  final IntegrationStatus? notificationStatus;
+  final bool notificationsEnabled;
 
   @override
   Widget build(BuildContext context) {
     final AppStrings strings = context.strings;
-    final RadarSignal? rawSignal = SignalEngine.createSignal(snapshot);
-    final RadarSignal? executionSignal = rawSignal == null
-        ? null
-        : PhaseAEngine.preview(market: snapshot, signal: rawSignal);
-    final DecisionSnapshot decision = DecisionEngine.build(
-      snapshot,
-      executionSignal: executionSignal,
-    );
     final RadarSemanticColors semantic = Theme.of(context)
         .extension<RadarSemanticColors>()!;
     final Color decisionColor = switch (decision.decision) {
@@ -80,10 +78,13 @@ class ProductDashboardScreen extends StatelessWidget {
             _ActionAndPlan(
               snapshot: snapshot,
               decision: decision,
+              readiness: readiness,
               strings: strings,
               onWhy: onWhy,
               onRefresh: onRefresh,
               onCalculateTrade: onCalculateTrade,
+              notificationStatus: notificationStatus,
+              notificationsEnabled: notificationsEnabled,
             ),
             const SizedBox(height: 14),
             LayoutBuilder(
@@ -487,28 +488,30 @@ class _ActionAndPlan extends StatelessWidget {
   const _ActionAndPlan({
     required this.snapshot,
     required this.decision,
+    required this.readiness,
     required this.strings,
     required this.onWhy,
     required this.onRefresh,
     required this.onCalculateTrade,
+    required this.notificationStatus,
+    required this.notificationsEnabled,
   });
 
   final MarketSnapshot snapshot;
   final DecisionSnapshot decision;
+  final EntryReadinessResult readiness;
   final AppStrings strings;
   final VoidCallback onWhy;
   final VoidCallback? onRefresh;
   final VoidCallback onCalculateTrade;
+  final IntegrationStatus? notificationStatus;
+  final bool notificationsEnabled;
 
   @override
   Widget build(BuildContext context) {
     final Color focusColor = Theme.of(context).colorScheme.primary;
     final RadarSemanticColors semantic = Theme.of(context)
         .extension<RadarSemanticColors>()!;
-    final EntryReadinessResult readiness = EntryReadinessGate.evaluate(
-      market: snapshot,
-      decision: decision,
-    );
     final bool hardBlocked = readiness.hardBlocked;
     final bool entryConfirmed = readiness.entryConfirmed;
     final bool entryReady = readiness.entryReady;
@@ -525,11 +528,7 @@ class _ActionAndPlan extends StatelessWidget {
         : entryReady
         ? strings.pick('ВХОД РАЗРЕШЁН', 'ENTRY READY')
         : strings.pick('ЖДАТЬ', 'WAIT');
-    final String statusLabel = hardBlocked
-        ? 'NO TRADE'
-        : entryReady
-        ? 'ENTRY READY'
-        : decision.entryDecision.label;
+    final String statusLabel = readiness.status.code;
     final DateTime sourceUpdatedAt =
         snapshot.ticker.sourceUpdatedAt ?? snapshot.updatedAt;
     final String dataAge = _dataAgeLabel(sourceUpdatedAt, strings);
@@ -601,6 +600,19 @@ class _ActionAndPlan extends StatelessWidget {
                 icon: Icons.adjust_rounded,
               ),
             ),
+            if (notificationStatus != null) ...<Widget>[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: ProductStatusChip(
+                  label: notificationsEnabled
+                      ? 'Telegram: ${notificationStatus!.message}'
+                      : 'Telegram: OFF',
+                  color: _notificationColor(semantic),
+                  icon: Icons.notifications_active_outlined,
+                ),
+              ),
+            ],
             const SizedBox(height: 14),
             Text(
               actionTitle,
@@ -709,6 +721,18 @@ class _ActionAndPlan extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Color _notificationColor(RadarSemanticColors semantic) {
+    if (!notificationsEnabled) return semantic.neutral;
+    return switch (notificationStatus?.state) {
+      IntegrationConnectionState.connected => semantic.bullish,
+      IntegrationConnectionState.checking => semantic.warning,
+      IntegrationConnectionState.disabled => semantic.neutral,
+      IntegrationConnectionState.notConfigured ||
+      IntegrationConnectionState.unavailable ||
+      null => semantic.bearish,
+    };
   }
 }
 

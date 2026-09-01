@@ -188,6 +188,48 @@ Last updated: 2026-08-29
 - Verification: `flutter analyze` clean; all 104 tests passed; Chrome debug
   launch connected, reached `main()` and exited normally without runtime errors.
 
+## DONE — Reliable local Telegram alert pipeline
+
+- Dashboard and Telegram now consume one immutable
+  `DecisionReadinessAnalysis`; an active Journal/TradeTracker signal is reused,
+  including learned execution-profile IDs, instead of recalculating a parallel
+  alert opinion.
+- Added typed readiness states (`WAIT`, `ALMOST READY`, `ENTRY READY`,
+  `PERMISSION SUSPENDED`, `INVALIDATED`), explicit next action and reason codes.
+- `ENTRY READY` contains tick-size-formatted Entry/Stop/TP levels, raw R:R for
+  TP1 and TP2, separate quality dimensions, data quality, confirmation time and
+  setup age. Setup score is explicitly described as factor agreement rather
+  than profit probability.
+- Alert event IDs are persisted locally. Successful events survive application
+  restarts without duplicates; failed relay calls retry the same ID with bounded
+  backoff and never mark a failed request as delivered.
+- The loopback relay also persists its non-secret delivered-event IDs and
+  serializes concurrent delivery of the same event.
+- TradeTracker transitions now produce Telegram lifecycle events for position
+  entry, TP1, TP2, Stop, cancellation and expiry. Ordinary confirmation loss is
+  debounced across two full analyses; missing/stale critical market data emits
+  a distinct immediate permission-suspended event.
+- Telegram connection state is shown separately from trading readiness on the
+  Action Now card. Lifecycle events do not open a misleading new-entry dialog.
+- Verification: `flutter analyze` clean; all 118 tests passed; production web
+  build succeeded; Chrome debug launch connected and exited normally.
+
+## DONE — Multi-asset background monitoring
+
+- BTCUSDT and FARTCOINUSDT are monitored by default even when only one asset is
+  open on screen. The local watchlist persists in application preferences.
+- Every asset passes through the same market, Journal, Decision Readiness and
+  Trade Alert pipeline. There is no separate or simplified alert strategy.
+- Assets are refreshed sequentially to avoid API bursts and concurrent journal
+  writes. A network/data failure for one asset does not stop the remaining
+  watchlist.
+- Integrations now shows an independent status and last-check time for every
+  monitored asset, with local switches that do not delete Journal history.
+- Existing persistent event IDs keep Telegram alerts unique per signal and
+  lifecycle event across all monitored symbols.
+- Verification: `flutter analyze` clean; all 120 tests passed; production web
+  build succeeded; Chrome debug launch connected and exited normally.
+
 ## TODO
 
 - Phase 3: deeper Market Structure Engine 2.0 and correction/BOS/CHOCH event history.
@@ -198,7 +240,9 @@ Last updated: 2026-08-29
   Paper Trading. The execution-cost model is implemented; historical fee-tier,
   funding and spread datasets still need a verified source for long studies.
 - A Pine Script mirror may be added after the strategy is stable, but it would recalculate the strategy inside TradingView rather than read local Flutter signals. A licensed Advanced Charts integration is a later deployment option.
-- Telegram outgoing `ENTRY_CONFIRMED` delivery is implemented through a local relay. Read-only commands, summaries and other external alert channels remain future work.
+- Telegram outgoing entry and TradeTracker lifecycle alerts are implemented
+  through a local relay. Read-only commands, scheduled summaries and other
+  external alert channels remain future work.
 - Advanced chart roadmap: Volume Profile, Footprint/Clusters, Heatmap, Order Flow, Replay, Journal trade overlays and Backtest replay.
 - Remaining UI depth: configurable Assets/Favorites/Opportunity Queue, real Alerts/News feeds, persisted UI preferences, Mistakes/Review editing and complete localization of legacy engine-generated explanation text.
 - Personal Journal next steps: connect the prepared import boundary to a Paper broker first, then a separately secured Bybit Demo broker; screenshot files and replay overlays remain future additions.

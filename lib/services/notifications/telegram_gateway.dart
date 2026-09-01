@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../models/integration_models.dart';
+import '../../models/execution_models.dart';
 import '../../models/trade_alert_models.dart';
+import '../../utils/market_price_formatter.dart';
 
 abstract interface class TelegramGateway {
   Future<IntegrationStatus> check(TelegramRelayConfig config);
@@ -93,7 +95,13 @@ class HttpTelegramRelayGateway implements TelegramGateway {
       _send(config, <String, Object?>{
         'eventId': 'test-${DateTime.now().microsecondsSinceEpoch}',
         'kind': 'TEST',
-        'text': 'Crypto Radar: Telegram relay подключён. MONITOR ONLY.',
+        'text':
+            '✅ Crypto Radar Telegram подключён\n\n'
+            'ENTRY READY alerts: ON\n'
+            'Relay: CONNECTED\n'
+            'Mode: LOCAL MONITOR ONLY\n\n'
+            'Это тест. Торговый сигнал не создавался.\n'
+            'Ордер не отправлялся.',
       });
 
   @override
@@ -101,19 +109,60 @@ class HttpTelegramRelayGateway implements TelegramGateway {
     final signal = alert.signal;
     final String direction = signal.direction.name.toUpperCase();
     return _send(config, <String, Object?>{
-      'eventId': 'entry-ready:${signal.id}',
-      'kind': 'ENTRY_READY',
+      'eventId': alert.eventId,
+      'kind': alert.kind.wireName,
       'symbol': signal.symbol,
       'direction': direction,
+      'stage': signal.stage.code,
+      'trackerStatus': signal.status.name.toUpperCase(),
       'score': signal.score,
+      'referencePriceText': formatMarketPrice(
+        signal.referencePrice,
+        tickSize: alert.tickSize,
+      ),
       'entryLow': signal.entryLow,
       'entryHigh': signal.entryHigh,
+      'entryLowText': formatMarketPrice(
+        signal.entryLow,
+        tickSize: alert.tickSize,
+      ),
+      'entryHighText': formatMarketPrice(
+        signal.entryHigh,
+        tickSize: alert.tickSize,
+      ),
       'stop': signal.stop,
+      'stopText': formatMarketPrice(signal.stop, tickSize: alert.tickSize),
       'tp1': signal.tp1,
+      'tp1Text': formatMarketPrice(signal.tp1, tickSize: alert.tickSize),
       'tp2': signal.tp2,
+      'tp2Text': formatMarketPrice(signal.tp2, tickSize: alert.tickSize),
       'createdAt': alert.createdAt.toUtc().toIso8601String(),
-      'riskReward': alert.riskReward,
-      'text': '🔔 ВХОД РАЗРЕШЁН · ${signal.symbol} · $direction',
+      'confirmedAt': alert.confirmedAt.toUtc().toIso8601String(),
+      'setupAgeSeconds': alert.setupAge.inSeconds,
+      'stopDistancePercent': alert.stopDistancePercent,
+      'stopDistancePercentText':
+          '${alert.stopDistancePercent.toStringAsFixed(2)}%',
+      'riskRewardTp1': alert.riskRewardTp1,
+      'riskRewardTp1Text': '1:${alert.riskRewardTp1.toStringAsFixed(2)}',
+      'riskRewardTp2': alert.riskRewardTp2,
+      'riskRewardTp2Text': '1:${alert.riskRewardTp2.toStringAsFixed(2)}',
+      'directionQuality': signal.qualities.direction,
+      'entryQuality': signal.qualities.entry,
+      'locationQuality': signal.qualities.location,
+      'liquidityQuality': signal.qualities.liquidity,
+      'stopQuality': signal.qualities.stop,
+      'riskQuality': signal.qualities.risk,
+      'dataQuality': alert.readiness.dataQuality.name.toUpperCase(),
+      'reasonCodes': alert.readiness.reasonCodes,
+      'entryTime': signal.entryTime?.toUtc().toIso8601String(),
+      'tp1Time': signal.tp1Time?.toUtc().toIso8601String(),
+      'tp2Time': signal.tp2Time?.toUtc().toIso8601String(),
+      'exitTime': signal.exitTime?.toUtc().toIso8601String(),
+      'resultR': signal.resultR,
+      'netResultR': signal.netResultR,
+      'mfeR': signal.mfeR,
+      'maeR': signal.maeR,
+      'text': 'Crypto Radar · ${alert.kind.wireName}',
     });
   }
 

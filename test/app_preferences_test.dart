@@ -21,6 +21,7 @@ void main() {
     expect(controller.accountRiskPercent, 0.5);
     expect(controller.personalMaxLeverage, 10);
     expect(controller.highRiskLeverageEnabled, isFalse);
+    expect(controller.monitoredSymbols, <String>['BTCUSDT', 'FARTCOINUSDT']);
     expect(const AppStrings(AppLanguage.ru).instrument, 'Инструмент');
 
     controller.setThemeMode(ThemeMode.light);
@@ -59,6 +60,7 @@ void main() {
         baseUrl: 'http://127.0.0.1:9999',
       ),
     );
+    first.setSymbolMonitored('BTCUSDT', false);
     await first.flushPendingWrites();
 
     final AppPreferencesController restored = AppPreferencesController(
@@ -77,6 +79,21 @@ void main() {
     expect(restored.feeModel.stopSlippagePercent, 0.08);
     expect(restored.telegramRelayConfig.enabled, isTrue);
     expect(restored.telegramRelayConfig.baseUrl, 'http://127.0.0.1:9999');
+    expect(restored.monitoredSymbols, <String>['FARTCOINUSDT']);
+  });
+
+  test('monitor list stays normalized, unique and never becomes empty', () {
+    final AppPreferencesController controller = AppPreferencesController(
+      storage: _MemoryStorage(),
+    );
+
+    controller.setSymbolMonitored(' btc/usdt ', true);
+    expect(controller.monitoredSymbols, <String>['BTCUSDT', 'FARTCOINUSDT']);
+
+    controller.setSymbolMonitored('BTCUSDT', false);
+    controller.setSymbolMonitored('FARTCOINUSDT', false);
+
+    expect(controller.monitoredSymbols, <String>['FARTCOINUSDT']);
   });
 }
 

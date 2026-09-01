@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto_radar/services/notifications/telegram_message_formatter.dart';
+
 const String _tokenVariable = 'CRYPTO_RADAR_TELEGRAM_BOT_TOKEN';
 const String _chatVariable = 'CRYPTO_RADAR_TELEGRAM_CHAT_ID';
 const String _portVariable = 'CRYPTO_RADAR_TELEGRAM_RELAY_PORT';
@@ -15,7 +17,13 @@ Future<void> main() async {
     InternetAddress.loopbackIPv4,
     port,
   );
-  final _TelegramRelay relay = _TelegramRelay(token: token, chatId: chatId);
+  final File ledgerFile = _eventLedgerFile();
+  final _TelegramRelay relay = _TelegramRelay(
+    token: token,
+    chatId: chatId,
+    ledgerFile: ledgerFile,
+    delivered: await _readDelivered(ledgerFile),
+  );
   stdout.writeln(
     'Crypto Radar Telegram relay: http://127.0.0.1:$port '
     '(${relay.configured ? 'configured' : 'NOT CONFIGURED'})',
@@ -26,12 +34,20 @@ Future<void> main() async {
 }
 
 class _TelegramRelay {
-  _TelegramRelay({required this.token, required this._chatId});
+  _TelegramRelay({
+    required this.token,
+    required this._chatId,
+    required this.ledgerFile,
+    required this._delivered,
+  });
 
   final String token;
   String _chatId;
-  final Set<String> _delivered = <String>{};
+  final File ledgerFile;
+  final Set<String> _delivered;
   final HttpClient _client = HttpClient();
+  final Map<String, Future<void>> _inFlight = <String, Future<void>>{};
+  Future<void> _ledgerWriteQueue = Future<void>.value();
 
   bool get configured => token.isNotEmpty && _chatId.isNotEmpty;
 
@@ -124,9 +140,22 @@ class _TelegramRelay {
         });
         return;
       }
-      await _sendTelegram(_formatMessage(decoded));
-      _delivered.add(eventId);
-      if (_delivered.length > 2000) _delivered.remove(_delivered.first);
+      final Future<void>? activeDelivery = _inFlight[eventId];
+      if (activeDelivery != null) {
+        await activeDelivery;
+        await _json(request.response, HttpStatus.ok, <String, Object?>{
+          'ok': true,
+          'duplicate': true,
+        });
+        return;
+      }
+      final Future<void> delivery = _deliverEvent(eventId, decoded);
+      _inFlight[eventId] = delivery;
+      try {
+        await delivery;
+      } finally {
+        _inFlight.remove(eventId);
+      }
       await _json(request.response, HttpStatus.ok, <String, Object?>{
         'ok': true,
         'duplicate': false,
@@ -166,6 +195,28 @@ class _TelegramRelay {
           : 'Telegram HTTP ${response.statusCode}';
       throw Exception(description);
     }
+  }
+
+  Future<void> _deliverEvent(
+    String eventId,
+    Map<String, dynamic> payload,
+  ) async {
+    await _sendTelegram(formatTelegramRelayMessage(payload));
+    _delivered.add(eventId);
+    if (_delivered.length > 2000) _delivered.remove(_delivered.first);
+    await _persistDelivered();
+  }
+
+  Future<void> _persistDelivered() async {
+    final String payload = jsonEncode(_delivered.toList());
+    _ledgerWriteQueue = _ledgerWriteQueue.then<void>((_) async {
+      await ledgerFile.parent.create(recursive: true);
+      final File temporary = File('${ledgerFile.path}.tmp');
+      await temporary.writeAsString(payload);
+      if (await ledgerFile.exists()) await ledgerFile.delete();
+      await temporary.rename(ledgerFile.path);
+    });
+    await _ledgerWriteQueue;
   }
 
   Future<String> _discoverChat() async {
@@ -216,23 +267,6 @@ class _TelegramRelay {
     throw Exception('Send /start to the bot, then try again');
   }
 
-  String _formatMessage(Map<String, dynamic> payload) {
-    if (payload['kind'] == 'TEST') {
-      return payload['text']?.toString() ?? 'Crypto Radar test';
-    }
-    final String symbol = payload['symbol']?.toString() ?? 'UNKNOWN';
-    final String direction = payload['direction']?.toString() ?? 'WAIT';
-    return <String>[
-      '🔔 Crypto Radar · ВХОД РАЗРЕШЁН',
-      '$symbol · $direction · сила ${payload['score'] ?? '—'}/100',
-      'Entry: ${payload['entryLow'] ?? '—'} – ${payload['entryHigh'] ?? '—'}',
-      'Stop: ${payload['stop'] ?? '—'}',
-      'TP1: ${payload['tp1'] ?? '—'} · TP2: ${payload['tp2'] ?? '—'}',
-      'R:R: ${payload['riskReward'] ?? '—'}',
-      'Только уведомление · ордер НЕ отправлен',
-    ].join('\n');
-  }
-
   bool _allowOrigin(String? origin) {
     if (origin == null || origin.isEmpty) return true;
     final Uri? uri = Uri.tryParse(origin);
@@ -275,5 +309,29 @@ class _TelegramRelay {
   String _safeError(Object error) {
     final String value = error.toString().replaceFirst('Exception: ', '');
     return value.replaceAll(token, '[REDACTED]');
+  }
+}
+
+File _eventLedgerFile() {
+  final String base =
+      Platform.environment['LOCALAPPDATA'] ?? Directory.systemTemp.path;
+  return File(
+    '$base${Platform.pathSeparator}CryptoRadar${Platform.pathSeparator}'
+    'telegram_delivered_events_v1.json',
+  );
+}
+
+Future<Set<String>> _readDelivered(File file) async {
+  try {
+    if (!await file.exists()) return <String>{};
+    final Object? decoded = jsonDecode(await file.readAsString());
+    if (decoded is! List<dynamic>) return <String>{};
+    return decoded
+        .map<String>((Object? value) => value?.toString() ?? '')
+        .where((String value) => value.isNotEmpty)
+        .take(2000)
+        .toSet();
+  } on Object {
+    return <String>{};
   }
 }

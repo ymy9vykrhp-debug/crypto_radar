@@ -79,7 +79,7 @@ class TradeSignalAlertDialog extends StatelessWidget {
                   _Value(label: 'TP2', value: _price(signal.tp2)),
                   _Value(
                     label: 'R:R',
-                    value: '1:${alert.riskReward.toStringAsFixed(1)}',
+                    value: '1:${alert.riskRewardTp1.toStringAsFixed(1)}',
                   ),
                   _Value(
                     label: strings.pick('Допустимое плечо', 'Max leverage'),

@@ -1,6 +1,12 @@
 import 'dart:convert';
 
+import 'package:crypto_radar/engines/entry_readiness_gate.dart';
+import 'package:crypto_radar/models/decision_models.dart';
+import 'package:crypto_radar/models/execution_models.dart';
 import 'package:crypto_radar/models/integration_models.dart';
+import 'package:crypto_radar/models/market_models.dart';
+import 'package:crypto_radar/models/signal_models.dart';
+import 'package:crypto_radar/models/trade_alert_models.dart';
 import 'package:crypto_radar/services/notifications/telegram_gateway.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -77,5 +83,97 @@ void main() {
         client.close();
       },
     );
+
+    test('trade alert sends the complete idempotent relay payload', () async {
+      late http.Request captured;
+      final MockClient client = MockClient((http.Request request) async {
+        captured = request;
+        return http.Response('{"ok":true}', 200);
+      });
+      final HttpTelegramRelayGateway gateway = HttpTelegramRelayGateway(client);
+      const TelegramRelayConfig config = TelegramRelayConfig(
+        enabled: true,
+        baseUrl: 'http://127.0.0.1:8787',
+      );
+
+      await gateway.sendTradeAlert(config, _alert());
+      final Map<String, dynamic> payload =
+          jsonDecode(captured.body) as Map<String, dynamic>;
+
+      expect(payload['eventId'], 'entry-ready:signal-telegram');
+      expect(payload['kind'], 'ENTRY_READY');
+      expect(payload['entryLowText'], '0.2010');
+      expect(payload['riskRewardTp1Text'], '1:1.29');
+      expect(payload['directionQuality'], 90);
+      expect(payload['dataQuality'], 'HIGH');
+      expect(captured.body, isNot(contains('token')));
+      expect(captured.body, isNot(contains('chatId')));
+      client.close();
+    });
   });
+}
+
+TradeAlert _alert() {
+  final DateTime now = DateTime.utc(2026, 8, 31, 12);
+  final RadarSignal signal = RadarSignal(
+    id: 'signal-telegram',
+    symbol: 'FARTCOINUSDT',
+    time: now.subtract(const Duration(minutes: 5)),
+    direction: SignalDirection.long,
+    referencePrice: 0.202,
+    entryLow: 0.201,
+    entryHigh: 0.202,
+    stop: 0.198,
+    tp1: 0.206,
+    tp2: 0.21,
+    score: 91,
+    trend5m: Bias.bullish,
+    trend15m: Bias.bullish,
+    trend1h: Bias.bullish,
+    rsi: 56,
+    macd: 0.001,
+    ema20: 0.202,
+    ema50: 0.2,
+    ema200: 0.19,
+    relativeVolume: 1.4,
+    rvolBias: Bias.bullish,
+    fvgBias: Bias.bullish,
+    orderBlockBias: Bias.bullish,
+    liquidityBias: Bias.bullish,
+    bos: Bias.bullish,
+    choch: Bias.neutral,
+    stage: SignalStage.entryConfirmed,
+    entryConfirmedTime: now,
+    qualities: const SignalQualityScores(
+      direction: 90,
+      entry: 85,
+      location: 82,
+      liquidity: 80,
+      stop: 78,
+      risk: 75,
+    ),
+  );
+  return TradeAlert(
+    kind: TradeAlertKind.entryReady,
+    signal: signal,
+    createdAt: now,
+    tickSize: 0.0001,
+    readiness: EntryReadinessResult(
+      signalId: signal.id,
+      evaluatedAt: now,
+      status: EntryReadinessStatus.entryReady,
+      nextAction: EntryNextAction.enter,
+      reasons: const <EntryReadinessReason>[],
+      dataQuality: DataQuality.high,
+      hardBlocked: false,
+      marketDataReady: true,
+      microstructureReady: true,
+      entryConfirmed: true,
+      priceInZone: true,
+      liquidityReady: true,
+      riskReady: true,
+      directionReady: true,
+      entryReady: true,
+    ),
+  );
 }

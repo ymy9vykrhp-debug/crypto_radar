@@ -6,6 +6,7 @@ import '../localization/app_strings.dart';
 import '../models/integration_models.dart';
 import '../models/market_models.dart';
 import '../services/app_preferences_controller.dart';
+import '../services/multi_asset_monitor_controller.dart';
 import '../services/notifications/telegram_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/product_components.dart';
@@ -15,11 +16,15 @@ class IntegrationsScreen extends StatefulWidget {
     super.key,
     required this.preferences,
     required this.telegramController,
+    required this.multiAssetMonitor,
+    this.onRefreshMonitor,
     this.ticker,
   });
 
   final AppPreferencesController preferences;
   final TelegramController telegramController;
+  final MultiAssetMonitorController multiAssetMonitor;
+  final Future<void> Function()? onRefreshMonitor;
   final TickerStats? ticker;
 
   @override
@@ -50,6 +55,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       animation: Listenable.merge(<Listenable>[
         widget.preferences,
         widget.telegramController,
+        widget.multiAssetMonitor,
       ]),
       builder: (BuildContext context, Widget? child) {
         final TelegramRelayConfig config =
@@ -67,6 +73,12 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
             ),
             const SizedBox(height: 14),
             _BybitDataCard(ticker: widget.ticker),
+            const SizedBox(height: 10),
+            _MultiAssetMonitorCard(
+              preferences: widget.preferences,
+              controller: widget.multiAssetMonitor,
+              onRefresh: widget.onRefreshMonitor,
+            ),
             const SizedBox(height: 10),
             Card(
               child: Padding(
@@ -237,6 +249,142 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       IntegrationConnectionState.disabled ||
       IntegrationConnectionState.notConfigured => semantic.neutral,
     };
+  }
+}
+
+class _MultiAssetMonitorCard extends StatelessWidget {
+  const _MultiAssetMonitorCard({
+    required this.preferences,
+    required this.controller,
+    this.onRefresh,
+  });
+
+  final AppPreferencesController preferences;
+  final MultiAssetMonitorController controller;
+  final Future<void> Function()? onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppStrings strings = context.strings;
+    final RadarSemanticColors semantic = Theme.of(context)
+        .extension<RadarSemanticColors>()!;
+    final List<String> availableSymbols = <String>{
+      ...AppPreferencesController.defaultMonitoredSymbols,
+      ...preferences.monitoredSymbols,
+    }.toList(growable: false);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            SectionHeading(
+              title: strings.pick(
+                'Фоновый монитор монет',
+                'Multi-Asset Monitor',
+              ),
+              subtitle: strings.pick(
+                'Один Signal Engine проверяет каждую монету отдельно и отправляет только уникальные события.',
+                'One Signal Engine checks every asset independently and sends unique events only.',
+              ),
+              icon: Icons.radar_rounded,
+              trailing: ProductStatusChip(
+                label: controller.running
+                    ? strings.pick('ПРОВЕРКА', 'CHECKING')
+                    : '${preferences.monitoredSymbols.length} ACTIVE',
+                color: controller.running ? semantic.warning : semantic.bullish,
+              ),
+            ),
+            const SizedBox(height: 10),
+            ...availableSymbols.map((String symbol) {
+              final bool monitored = preferences.isSymbolMonitored(symbol);
+              final AssetMonitorStatus status = controller.statusFor(symbol);
+              return _MonitorSymbolRow(
+                symbol: symbol,
+                monitored: monitored,
+                status: status,
+                onChanged: (bool enabled) {
+                  preferences.setSymbolMonitored(symbol, enabled);
+                  final Future<void> Function()? refresh = onRefresh;
+                  if (enabled && refresh != null) unawaited(refresh());
+                },
+              );
+            }),
+            const SizedBox(height: 8),
+            Text(
+              strings.pick(
+                'По умолчанию BTCUSDT и FARTCOINUSDT проверяются последовательно каждые 15 секунд. Выключение монеты не удаляет её историю из Журнала.',
+                'BTCUSDT and FARTCOINUSDT are checked sequentially every 15 seconds by default. Disabling an asset does not delete its Journal history.',
+              ),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MonitorSymbolRow extends StatelessWidget {
+  const _MonitorSymbolRow({
+    required this.symbol,
+    required this.monitored,
+    required this.status,
+    required this.onChanged,
+  });
+
+  final String symbol;
+  final bool monitored;
+  final AssetMonitorStatus status;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final RadarSemanticColors semantic = Theme.of(context)
+        .extension<RadarSemanticColors>()!;
+    final (String, Color, IconData) presentation = switch (status.state) {
+      AssetMonitorState.idle => (
+        context.strings.pick('ОЖИДАНИЕ', 'WAITING'),
+        semantic.neutral,
+        Icons.schedule_rounded,
+      ),
+      AssetMonitorState.checking => (
+        context.strings.pick('ПРОВЕРКА', 'CHECKING'),
+        semantic.warning,
+        Icons.sync_rounded,
+      ),
+      AssetMonitorState.ready => (
+        context.strings.pick('ДАННЫЕ OK', 'DATA OK'),
+        semantic.bullish,
+        Icons.check_circle_outline_rounded,
+      ),
+      AssetMonitorState.error => (
+        context.strings.pick('ОШИБКА', 'ERROR'),
+        semantic.bearish,
+        Icons.error_outline_rounded,
+      ),
+    };
+    final DateTime? checkedAt = status.lastCheckedAt;
+    final String checkedText = checkedAt == null
+        ? context.strings.pick('ещё не проверено', 'not checked yet')
+        : '${checkedAt.hour.toString().padLeft(2, '0')}:'
+              '${checkedAt.minute.toString().padLeft(2, '0')}:'
+              '${checkedAt.second.toString().padLeft(2, '0')}';
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Switch(value: monitored, onChanged: onChanged),
+      title: Text(symbol, style: const TextStyle(fontWeight: FontWeight.w800)),
+      subtitle: Text(
+        status.error == null ? checkedText : '${status.error} · $checkedText',
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: ProductStatusChip(
+        label: monitored ? presentation.$1 : 'OFF',
+        color: monitored ? presentation.$2 : semantic.neutral,
+        icon: monitored ? presentation.$3 : Icons.pause_circle_outline_rounded,
+      ),
+    );
   }
 }
 

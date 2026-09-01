@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../engines/decision_engine.dart';
+import '../engines/decision_readiness_engine.dart';
 import '../engines/phase_a_engine.dart';
 import '../engines/signal_engine.dart';
 import '../localization/app_strings.dart';
@@ -114,8 +115,15 @@ class AssetWorkspaceScreen extends StatelessWidget {
   Widget _content() {
     switch (selected) {
       case WorkspaceSection.overview:
+        final DecisionReadinessAnalysis analysis =
+            DecisionReadinessEngine.evaluate(
+              market: snapshot,
+              trackedSignals: journalController.signals,
+            );
         return ProductDashboardScreen(
           snapshot: snapshot,
+          decision: analysis.decision,
+          readiness: analysis.readiness,
           journalController: journalController,
           livePrice: livePrice,
           onWhy: () => onSelected(WorkspaceSection.why),

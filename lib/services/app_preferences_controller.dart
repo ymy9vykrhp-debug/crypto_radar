@@ -13,6 +13,11 @@ class AppPreferencesController extends ChangeNotifier {
     : _storage = storage ?? createLocalStorageBackend();
 
   static const String _storageKey = 'app_preferences_v2';
+  static const List<String> defaultMonitoredSymbols = <String>[
+    'BTCUSDT',
+    'FARTCOINUSDT',
+  ];
+  static const int maxMonitoredSymbols = 5;
 
   final LocalStorageBackend _storage;
   ThemeMode _themeMode = ThemeMode.dark;
@@ -26,6 +31,7 @@ class AppPreferencesController extends ChangeNotifier {
   bool _highRiskLeverageEnabled = false;
   FeeModel _feeModel = const FeeModel();
   TelegramRelayConfig _telegramRelayConfig = const TelegramRelayConfig();
+  List<String> _monitoredSymbols = List<String>.of(defaultMonitoredSymbols);
   bool _initialized = false;
   Future<void> _writeQueue = Future<void>.value();
 
@@ -43,6 +49,8 @@ class AppPreferencesController extends ChangeNotifier {
   bool get highRiskLeverageEnabled => _highRiskLeverageEnabled;
   FeeModel get feeModel => _feeModel;
   TelegramRelayConfig get telegramRelayConfig => _telegramRelayConfig;
+  List<String> get monitoredSymbols =>
+      List<String>.unmodifiable(_monitoredSymbols);
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -106,6 +114,16 @@ class AppPreferencesController extends ChangeNotifier {
       final Object? telegramJson = decoded['telegramRelayConfig'];
       if (telegramJson is Map<String, dynamic>) {
         _telegramRelayConfig = TelegramRelayConfig.fromJson(telegramJson);
+      }
+      final Object? monitoredJson = decoded['monitoredSymbols'];
+      if (monitoredJson is List<dynamic>) {
+        final List<String> restored = monitoredJson
+            .map<String>((dynamic value) => _normalizeSymbol('$value'))
+            .where(_isSupportedMonitorSymbol)
+            .toSet()
+            .take(maxMonitoredSymbols)
+            .toList(growable: false);
+        if (restored.isNotEmpty) _monitoredSymbols = restored;
       }
       notifyListeners();
     } on Object {
@@ -198,6 +216,27 @@ class AppPreferencesController extends ChangeNotifier {
     _scheduleSave();
   }
 
+  bool isSymbolMonitored(String symbol) =>
+      _monitoredSymbols.contains(_normalizeSymbol(symbol));
+
+  void setSymbolMonitored(String symbol, bool monitored) {
+    final String normalized = _normalizeSymbol(symbol);
+    if (!_isSupportedMonitorSymbol(normalized)) return;
+    final List<String> updated = List<String>.of(_monitoredSymbols);
+    if (monitored) {
+      if (updated.contains(normalized) ||
+          updated.length >= maxMonitoredSymbols) {
+        return;
+      }
+      updated.add(normalized);
+    } else {
+      if (!updated.remove(normalized) || updated.isEmpty) return;
+    }
+    _monitoredSymbols = updated;
+    notifyListeners();
+    _scheduleSave();
+  }
+
   void _scheduleSave() {
     final String payload = jsonEncode(<String, Object?>{
       'themeMode': _themeMode.name,
@@ -211,6 +250,7 @@ class AppPreferencesController extends ChangeNotifier {
       'highRiskLeverageEnabled': _highRiskLeverageEnabled,
       'feeModel': _feeModel.toJson(),
       'telegramRelayConfig': _telegramRelayConfig.toJson(),
+      'monitoredSymbols': _monitoredSymbols,
     });
     _writeQueue = _writeQueue
         .then<void>((_) => _storage.write(_storageKey, payload))
@@ -220,4 +260,10 @@ class AppPreferencesController extends ChangeNotifier {
   }
 
   Future<void> flushPendingWrites() => _writeQueue;
+
+  static String _normalizeSymbol(String value) =>
+      value.trim().toUpperCase().replaceAll('/', '').replaceAll(' ', '');
+
+  static bool _isSupportedMonitorSymbol(String value) =>
+      value.length > 4 && value.endsWith('USDT');
 }

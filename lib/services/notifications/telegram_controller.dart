@@ -84,16 +84,18 @@ class TelegramController extends ChangeNotifier {
     }
   }
 
-  Future<void> deliver(TradeAlert alert) async {
-    if (!preferences.telegramRelayConfig.enabled) return;
+  Future<bool> deliver(TradeAlert alert) async {
+    if (!preferences.telegramRelayConfig.enabled) return true;
     try {
       await gateway.sendTradeAlert(preferences.telegramRelayConfig, alert);
-      _lastDelivery = 'SENT ${alert.signal.id}';
+      _lastDelivery = 'SENT ${alert.eventId}';
       _status = IntegrationStatus(
         state: IntegrationConnectionState.connected,
         message: 'CONNECTED',
         checkedAt: DateTime.now(),
       );
+      notifyListeners();
+      return true;
     } on Object catch (error) {
       _lastDelivery = 'FAILED: ${_clean(error)}';
       _status = IntegrationStatus(
@@ -101,8 +103,9 @@ class TelegramController extends ChangeNotifier {
         message: 'DELIVERY FAILED',
         checkedAt: DateTime.now(),
       );
+      notifyListeners();
+      return false;
     }
-    notifyListeners();
   }
 
   String _clean(Object error) => error

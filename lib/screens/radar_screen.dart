@@ -4,10 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../engines/backtest_engine.dart';
-import '../engines/decision_engine.dart';
-import '../engines/entry_readiness_gate.dart';
-import '../engines/phase_a_engine.dart';
-import '../engines/signal_engine.dart';
+import '../engines/decision_readiness_engine.dart';
 import '../localization/app_strings.dart';
 import '../models/crypto_universe_models.dart';
 import '../models/decision_models.dart';
@@ -23,6 +20,7 @@ import '../services/crypto_universe_controller.dart';
 import '../services/journal_controller.dart';
 import '../services/journal_store.dart';
 import '../services/live_price_service.dart';
+import '../services/multi_asset_monitor_controller.dart';
 import '../services/notification_sound_service.dart';
 import '../services/notifications/telegram_controller.dart';
 import '../services/notifications/telegram_gateway.dart';
@@ -66,7 +64,9 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
   late final Future<void> _journalReady;
   late final LivePriceService _livePriceService;
   late final TradeAlertController _tradeAlertController;
+  late final Future<void> _tradeAlertsReady;
   late final TelegramController _telegramController;
+  late final MultiAssetMonitorController _multiAssetMonitor;
   final NotificationSoundPlayer _soundPlayer =
       const SystemNotificationSoundPlayer();
   Timer? _refreshTimer;
@@ -96,10 +96,19 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
     );
     _journalReady = _journalController.initialize();
     _tradeAlertController = TradeAlertController();
+    _tradeAlertsReady = _tradeAlertController.initialize();
     _telegramController = TelegramController(
       preferences: widget.preferences,
       gateway: HttpTelegramRelayGateway(_client),
+    )..addListener(_onTelegramStatusChanged);
+    _multiAssetMonitor = MultiAssetMonitorController(
+      snapshotLoader: _repository.load,
+      snapshotProcessor: _processMonitoredSnapshot,
+      // Scanner's default Top Liquid list contains 30 instruments. The
+      // monitor is intentionally independent of the asset open in the UI.
+      maxSymbols: 30,
     );
+    unawaited(_telegramController.refreshStatus());
     _livePriceService = LivePriceService()..addListener(_onLivePriceChanged);
     _universeController.initialize();
     if (widget.autoStart) {
@@ -115,7 +124,10 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
       ..removeListener(_onLivePriceChanged)
       ..dispose();
     _tradeAlertController.dispose();
-    _telegramController.dispose();
+    _multiAssetMonitor.dispose();
+    _telegramController
+      ..removeListener(_onTelegramStatusChanged)
+      ..dispose();
     _livePrice.dispose();
     _universeController.dispose();
     _journalController.dispose();
@@ -136,39 +148,55 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
 
   Future<void> _refresh() async {
     if (_loading) return;
+    final String requestedSymbol = _selectedSymbol;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final MarketSnapshot result = await _repository.load(_selectedSymbol);
-      if (!mounted || result.symbol != _selectedSymbol) return;
-      await _journalReady;
-      _tradeAlertController.prime(_journalController.signals);
-      await _journalController.processLiveSnapshot(result);
+      final Iterable<String> scannerSymbols =
+          _universeController.visibleAssets.isEmpty
+          ? widget.preferences.monitoredSymbols
+          : _universeController.visibleAssets.map(
+              (CryptoAsset asset) => asset.symbol,
+            );
+      final Map<String, MarketSnapshot> results = await _multiAssetMonitor
+          .refresh(<String>[requestedSymbol, ...scannerSymbols]);
       if (!mounted) return;
-      setState(() => _snapshot = result);
-      final DecisionSnapshot decision = _decisionFor(result);
-      final EntryReadinessResult readiness = EntryReadinessGate.evaluate(
-        market: result,
-        decision: decision,
-      );
-      final TradeAlert? alert = _tradeAlertController.evaluate(
-        _journalController.signals.where(
-          (RadarSignal signal) => signal.symbol == result.symbol,
-        ),
-        readiness: readiness,
-      );
-      if (alert != null) {
-        WidgetsBinding.instance.addPostFrameCallback(
-          (_) => _presentTradeAlert(alert, result),
-        );
+      final MarketSnapshot? selectedResult = results[requestedSymbol];
+      if (_selectedSymbol == requestedSymbol && selectedResult != null) {
+        setState(() => _snapshot = selectedResult);
+      } else if (_selectedSymbol == requestedSymbol) {
+        final String message =
+            _multiAssetMonitor.statusFor(requestedSymbol).error ??
+            'Market data is unavailable.';
+        setState(() => _error = _friendlyError(message));
       }
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _error = _friendlyError(error));
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _processMonitoredSnapshot(MarketSnapshot snapshot) async {
+    await _journalReady;
+    await _tradeAlertsReady;
+    if (!mounted) return;
+    _tradeAlertController.prime(_journalController.signals);
+    await _journalController.processLiveSnapshot(snapshot);
+    if (!mounted) return;
+    final DecisionReadinessAnalysis analysis = _analysisFor(snapshot);
+    final List<TradeAlert> alerts = _tradeAlertController.evaluateEvents(
+      _journalController.signals.where(
+        (RadarSignal signal) => signal.symbol == snapshot.symbol,
+      ),
+      readiness: analysis.readiness,
+      tickSize: snapshot.tradingRules?.tickSize ?? 0.0,
+    );
+    for (final TradeAlert alert in alerts) {
+      await _handleTradeAlert(alert, snapshot);
     }
   }
 
@@ -192,6 +220,10 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
     }
   }
 
+  void _onTelegramStatusChanged() {
+    if (mounted) setState(() {});
+  }
+
   Future<void> _setUpdateMode(MarketUpdateMode mode) async {
     if (_updateMode == mode) return;
     setState(() => _updateMode = mode);
@@ -209,17 +241,34 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
     }
   }
 
-  Future<void> _presentTradeAlert(
+  Future<void> _handleTradeAlert(
     TradeAlert alert,
     MarketSnapshot snapshot,
   ) async {
-    if (!mounted ||
-        _showingTradeAlert ||
-        alert.signal.symbol != snapshot.symbol) {
+    if (!mounted || alert.signal.symbol != snapshot.symbol) {
       return;
     }
+    final bool deliveryHandled = await _telegramController.deliver(alert);
+    await _tradeAlertController.recordDelivery(
+      alert,
+      successful: deliveryHandled,
+    );
+    if (!mounted ||
+        alert.kind != TradeAlertKind.entryReady ||
+        alert.deliveryAttempt > 1) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => unawaited(_showTradeAlert(alert, snapshot)),
+    );
+  }
+
+  Future<void> _showTradeAlert(
+    TradeAlert alert,
+    MarketSnapshot snapshot,
+  ) async {
+    if (!mounted || _showingTradeAlert) return;
     _showingTradeAlert = true;
-    unawaited(_telegramController.deliver(alert));
     if (widget.preferences.soundEnabled) {
       await _soundPlayer.playStrongAlert();
     }
@@ -230,8 +279,9 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
       builder: (BuildContext dialogContext) => TradeSignalAlertDialog(
         alert: alert,
         snapshot: snapshot,
-        onOpenMarket: () => _openWorkspace(WorkspaceSection.overview),
-        onWhy: () => _openWorkspace(WorkspaceSection.why),
+        onOpenMarket: () =>
+            _openMonitoredAsset(snapshot.symbol, WorkspaceSection.overview),
+        onWhy: () => _openMonitoredAsset(snapshot.symbol, WorkspaceSection.why),
         onCalculateTrade: () => _openPositionCalculator(snapshot),
       ),
     );
@@ -278,6 +328,20 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
     _selectSymbol(symbol);
   }
 
+  void _openMonitoredAsset(String symbol, WorkspaceSection section) {
+    setState(() {
+      _section = AppSection.market;
+      _marketView = MarketSectionView.workspace;
+    });
+    unawaited(
+      _selectSymbol(symbol).then((_) {
+        if (mounted && _selectedSymbol == symbol) {
+          setState(() => _workspaceSection = section);
+        }
+      }),
+    );
+  }
+
   void _selectSection(AppSection section) {
     setState(() => _section = section);
   }
@@ -291,14 +355,7 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
   }
 
   Future<void> _openPositionCalculator(MarketSnapshot snapshot) async {
-    final RadarSignal? rawSignal = SignalEngine.createSignal(snapshot);
-    final RadarSignal? executionSignal = rawSignal == null
-        ? null
-        : PhaseAEngine.preview(market: snapshot, signal: rawSignal);
-    final DecisionSnapshot decision = DecisionEngine.build(
-      snapshot,
-      executionSignal: executionSignal,
-    );
+    final DecisionSnapshot decision = _analysisFor(snapshot).decision;
     CryptoAsset? asset;
     for (final CryptoAsset candidate in _universeController.assets) {
       if (candidate.symbol == snapshot.symbol) {
@@ -336,11 +393,14 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
   }
 
   DecisionSnapshot _decisionFor(MarketSnapshot snapshot) {
-    final RadarSignal? rawSignal = SignalEngine.createSignal(snapshot);
-    final RadarSignal? executionSignal = rawSignal == null
-        ? null
-        : PhaseAEngine.preview(market: snapshot, signal: rawSignal);
-    return DecisionEngine.build(snapshot, executionSignal: executionSignal);
+    return _analysisFor(snapshot).decision;
+  }
+
+  DecisionReadinessAnalysis _analysisFor(MarketSnapshot snapshot) {
+    return DecisionReadinessEngine.evaluate(
+      market: snapshot,
+      trackedSignals: _journalController.signals,
+    );
   }
 
   @override
@@ -544,14 +604,19 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
     switch (_section) {
       case AppSection.home:
         if (_snapshot == null) return _buildEmptyState();
+        final DecisionReadinessAnalysis analysis = _analysisFor(_snapshot!);
         return ProductDashboardScreen(
           snapshot: _snapshot!,
+          decision: analysis.decision,
+          readiness: analysis.readiness,
           journalController: _journalController,
           livePrice: _livePrice,
           onWhy: () => _openWorkspace(WorkspaceSection.why),
           onOpenWorkspace: () => _openWorkspace(WorkspaceSection.overview),
           onCalculateTrade: () => _openPositionCalculator(_snapshot!),
           onRefresh: _loading ? null : _refresh,
+          notificationStatus: _telegramController.status,
+          notificationsEnabled: widget.preferences.telegramRelayConfig.enabled,
         );
       case AppSection.market:
         return _buildMarketContent();
@@ -572,6 +637,8 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
         return IntegrationsScreen(
           preferences: widget.preferences,
           telegramController: _telegramController,
+          multiAssetMonitor: _multiAssetMonitor,
+          onRefreshMonitor: _refresh,
           ticker: _snapshot?.ticker,
         );
       case AppSection.settings:
