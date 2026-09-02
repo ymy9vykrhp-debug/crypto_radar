@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../models/integration_models.dart';
 import '../../models/execution_models.dart';
+import '../../models/first_move_models.dart';
 import '../../models/trade_alert_models.dart';
 import '../../utils/market_price_formatter.dart';
 
@@ -146,6 +147,24 @@ class HttpTelegramRelayGateway implements TelegramGateway {
       'riskRewardTp1Text': '1:${alert.riskRewardTp1.toStringAsFixed(2)}',
       'riskRewardTp2': alert.riskRewardTp2,
       'riskRewardTp2Text': '1:${alert.riskRewardTp2.toStringAsFixed(2)}',
+      'netRiskReward': alert.readiness.netRiskReward,
+      'netRiskRewardText':
+          '1:${alert.readiness.netRiskReward.toStringAsFixed(2)}',
+      'expectedMovePercent': alert.readiness.targetMovePercent,
+      'expectedMovePercentText':
+          '${alert.readiness.targetMovePercent.toStringAsFixed(2)}%',
+      'setupType': signal.executionProfileId,
+      'tradingMode': signal.firstMove.tradingMode,
+      'marketRegime': signal.firstMove.marketRegime,
+      'historicalSamples': signal.firstMove.historicalSamples,
+      'historicalConfidence': signal.firstMove.historicalConfidence.code,
+      'firstMoveProbability020': signal.firstMove.probability020,
+      'firstMoveProbability030': signal.firstMove.probability030,
+      'firstMoveProbability050': signal.firstMove.probability050,
+      'firstMoveProbability075': signal.firstMove.probability075,
+      'firstMoveProbability100': signal.firstMove.probability100,
+      'stopFirstProbability': signal.firstMove.probabilityStopFirst,
+      'setupReasonCodes': signal.reasonCodes,
       'directionQuality': signal.qualities.direction,
       'entryQuality': signal.qualities.entry,
       'locationQuality': signal.qualities.location,

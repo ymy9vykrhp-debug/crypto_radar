@@ -1,4 +1,5 @@
 import '../models/market_models.dart';
+import '../models/first_move_models.dart';
 import '../models/signal_models.dart';
 import '../models/execution_models.dart';
 
@@ -96,6 +97,7 @@ class TradeTracker {
       exitTime: candle.time,
       lastTrackedCandleTime: candle.time,
       resultR: resultR,
+      firstMove: source.firstMove.copyWith(observationComplete: true),
     );
   }
 
@@ -106,6 +108,7 @@ class TradeTracker {
         status: SignalStatus.cancelled,
         stage: SignalStage.cancelled,
         exitTime: candle.time,
+        firstMove: source.firstMove.copyWith(observationComplete: true),
       );
     }
 
@@ -136,6 +139,9 @@ class TradeTracker {
     final bool stopTouched = signal.direction == SignalDirection.long
         ? candle.low <= effectiveStop
         : candle.high >= effectiveStop;
+    final bool structuralStopTouched = signal.direction == SignalDirection.long
+        ? candle.low <= signal.stop
+        : candle.high >= signal.stop;
     final bool tp1Touched = signal.direction == SignalDirection.long
         ? candle.high >= signal.tp1
         : candle.low <= signal.tp1;
@@ -146,6 +152,11 @@ class TradeTracker {
     // A 5m candle does not reveal the intrabar order. If stop and target are
     // both touched, the conservative assumption is that the stop came first.
     if (stopTouched) {
+      final firstMove = _trackFirstMove(
+        signal,
+        candle,
+        stopTouched: structuralStopTouched,
+      ).copyWith(observationComplete: true);
       final double resultR = signal.tp1Time == null
           ? -1.0
           : signal.style == SignalStyle.scalp
@@ -183,8 +194,10 @@ class TradeTracker {
         reclaimedLevel: reclaimed,
         postStopTrackingUntil: candle.time.add(aftermathWindow),
         resultR: resultR,
+        firstMove: firstMove,
       );
     }
+    signal = signal.copyWith(firstMove: _trackFirstMove(signal, candle));
     if (tp2Touched) {
       final double resultR =
           (_targetR(signal.tp1, signal) + _targetR(signal.tp2, signal)) / 2.0;
@@ -195,6 +208,7 @@ class TradeTracker {
         tp2Time: candle.time,
         exitTime: candle.time,
         resultR: resultR,
+        firstMove: signal.firstMove.copyWith(observationComplete: true),
       );
     }
     if (tp1Touched && signal.tp1Time == null) {
@@ -205,6 +219,48 @@ class TradeTracker {
       );
     }
     return signal;
+  }
+
+  FirstMoveRecord _trackFirstMove(
+    RadarSignal signal,
+    Candle candle, {
+    bool stopTouched = false,
+  }) {
+    final FirstMoveRecord current = signal.firstMove;
+    if (current.observationComplete) return current;
+    // A single candle does not reveal whether its high or low happened first.
+    // If it also touches the structural Stop, no target from this bar is
+    // counted as reached-before-stop.
+    if (stopTouched) {
+      return current.copyWith(stopHitFirst: !current.hit020);
+    }
+    bool touched(double thresholdPercent) {
+      final double distance = signal.entryPrice * thresholdPercent / 100.0;
+      final double target = signal.direction == SignalDirection.long
+          ? signal.entryPrice + distance
+          : signal.entryPrice - distance;
+      return signal.direction == SignalDirection.long
+          ? candle.high >= target
+          : candle.low <= target;
+    }
+
+    final bool hit020 = current.hit020 || touched(0.20);
+    final bool hit030 = current.hit030 || touched(0.30);
+    final bool hit050 = current.hit050 || touched(0.50);
+    final bool hit075 = current.hit075 || touched(0.75);
+    final bool hit100 = current.hit100 || touched(1.00);
+    return current.copyWith(
+      hit020: hit020,
+      hit030: hit030,
+      hit050: hit050,
+      hit075: hit075,
+      hit100: hit100,
+      time020: current.time020 ?? (hit020 ? candle.time : null),
+      time030: current.time030 ?? (hit030 ? candle.time : null),
+      time050: current.time050 ?? (hit050 ? candle.time : null),
+      time075: current.time075 ?? (hit075 ? candle.time : null),
+      time100: current.time100 ?? (hit100 ? candle.time : null),
+    );
   }
 
   RadarSignal _trackAfterStop(RadarSignal source, Candle candle) {

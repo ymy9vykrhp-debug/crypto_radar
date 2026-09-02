@@ -63,6 +63,8 @@ class MultiAssetMonitorController extends ChangeNotifier {
   final int maxSymbols;
   final Map<String, AssetMonitorStatus> _statuses =
       <String, AssetMonitorStatus>{};
+  final Map<String, MarketSnapshot> _latestSnapshots =
+      <String, MarketSnapshot>{};
 
   bool _running = false;
   int _completedCycles = 0;
@@ -71,6 +73,11 @@ class MultiAssetMonitorController extends ChangeNotifier {
   int get completedCycles => _completedCycles;
   Map<String, AssetMonitorStatus> get statuses =>
       UnmodifiableMapView<String, AssetMonitorStatus>(_statuses);
+  Map<String, MarketSnapshot> get latestSnapshots =>
+      UnmodifiableMapView<String, MarketSnapshot>(_latestSnapshots);
+
+  MarketSnapshot? latestSnapshotFor(String symbol) =>
+      _latestSnapshots[_normalize(symbol)];
 
   AssetMonitorStatus statusFor(String symbol) {
     final String normalized = _normalize(symbol);
@@ -105,6 +112,9 @@ class MultiAssetMonitorController extends ChangeNotifier {
               'Expected $symbol but received ${snapshot.symbol}.',
             );
           }
+          // Store before processing so the shared decision gate can use the
+          // just-loaded BTC benchmark while evaluating another instrument.
+          _latestSnapshots[symbol] = snapshot;
           await snapshotProcessor(snapshot);
           final DateTime completedAt = _clock();
           results[symbol] = snapshot;

@@ -1,6 +1,11 @@
+import '../config/trading_safety_config.dart';
 import '../models/decision_models.dart';
 import '../models/execution_models.dart';
+import '../models/first_move_models.dart';
 import '../models/market_models.dart';
+import '../models/position_calculator_models.dart';
+import '../models/signal_models.dart';
+import 'structural_target_engine.dart';
 
 enum EntryReadinessStatus {
   wait,
@@ -57,6 +62,21 @@ enum EntryReadinessReason {
   stopQualityLow,
   riskQualityLow,
   directionQualityLow,
+  setupMissing,
+  entryZoneMissing,
+  targetTooClose,
+  targetNotStructural,
+  obstacleBeforeTarget,
+  structuralStopMissing,
+  stopTooTight,
+  riskRewardTooLow,
+  entryTriggerMissing,
+  signalStale,
+  liquidityInvalid,
+  marketConflict,
+  historicalSamplesLow,
+  firstMoveProbabilityLow,
+  spreadTooWide,
 }
 
 extension EntryReadinessReasonText on EntryReadinessReason {
@@ -73,6 +93,22 @@ extension EntryReadinessReasonText on EntryReadinessReason {
     EntryReadinessReason.stopQualityLow => 'STOP_QUALITY_FAILED',
     EntryReadinessReason.riskQualityLow => 'RISK_QUALITY_FAILED',
     EntryReadinessReason.directionQualityLow => 'DIRECTION_QUALITY_FAILED',
+    EntryReadinessReason.setupMissing => 'SETUP_MISSING',
+    EntryReadinessReason.entryZoneMissing => 'ENTRY_ZONE_MISSING',
+    EntryReadinessReason.targetTooClose => 'TARGET_TOO_CLOSE',
+    EntryReadinessReason.targetNotStructural => 'STRUCTURAL_TARGET_MISSING',
+    EntryReadinessReason.obstacleBeforeTarget => 'OBSTACLE_BEFORE_TARGET',
+    EntryReadinessReason.structuralStopMissing => 'STRUCTURAL_STOP_MISSING',
+    EntryReadinessReason.stopTooTight => 'STOP_TOO_TIGHT',
+    EntryReadinessReason.riskRewardTooLow => 'RR_TOO_LOW',
+    EntryReadinessReason.entryTriggerMissing => 'ENTRY_TRIGGER_MISSING',
+    EntryReadinessReason.signalStale => 'SIGNAL_STALE',
+    EntryReadinessReason.liquidityInvalid => 'LIQUIDITY_INVALID',
+    EntryReadinessReason.marketConflict => 'MARKET_CONFLICT',
+    EntryReadinessReason.historicalSamplesLow => 'HISTORICAL_SAMPLES_LOW',
+    EntryReadinessReason.firstMoveProbabilityLow =>
+      'FIRST_MOVE_PROBABILITY_LOW',
+    EntryReadinessReason.spreadTooWide => 'SPREAD_TOO_WIDE',
   };
 }
 
@@ -86,24 +122,31 @@ class EntryReadinessGate {
   static EntryReadinessResult evaluate({
     required MarketSnapshot market,
     required DecisionSnapshot decision,
+    RadarSignal? signal,
+    MarketSnapshot? benchmarkMarket,
+    FeeModel feeModel = const FeeModel(),
     String? signalId,
     DateTime? evaluatedAt,
   }) {
     final List<EntryReadinessReason> reasons = <EntryReadinessReason>[];
+    void addReason(EntryReadinessReason reason) {
+      if (!reasons.contains(reason)) reasons.add(reason);
+    }
+
     if (decision.dataQuality == DataQuality.low) {
-      reasons.add(EntryReadinessReason.dataQualityLow);
+      addReason(EntryReadinessReason.dataQualityLow);
     }
     if (market.dataIntegrity.hasCriticalIssue) {
-      reasons.add(EntryReadinessReason.criticalMarketData);
+      addReason(EntryReadinessReason.criticalMarketData);
     }
     if (!market.dataIntegrity.hasFreshBidAsk) {
-      reasons.add(EntryReadinessReason.staleBidAsk);
+      addReason(EntryReadinessReason.staleBidAsk);
     }
     if (!market.dataIntegrity.hasInstrumentRules) {
-      reasons.add(EntryReadinessReason.missingInstrumentRules);
+      addReason(EntryReadinessReason.missingInstrumentRules);
     }
     if (decision.executionAction.toUpperCase().contains('NO TRADE')) {
-      reasons.add(EntryReadinessReason.hardBlock);
+      addReason(EntryReadinessReason.hardBlock);
     }
     final bool marketDataReady =
         decision.dataQuality != DataQuality.low &&
@@ -131,25 +174,208 @@ class EntryReadinessGate {
     final bool riskReady =
         decision.qualityScores.stop >= 70 && decision.qualityScores.risk >= 70;
     final bool directionReady = decision.qualityScores.direction >= 65;
-    if (!entryConfirmed) reasons.add(EntryReadinessReason.entryNotConfirmed);
+    if (!entryConfirmed) addReason(EntryReadinessReason.entryNotConfirmed);
     if (decision.entryDecision != EntryDecision.enterNow) {
-      reasons.add(EntryReadinessReason.entryDecisionWait);
+      addReason(EntryReadinessReason.entryDecisionWait);
     }
     if (!priceInZone) {
-      reasons.add(EntryReadinessReason.priceOutsideEntryZone);
+      addReason(EntryReadinessReason.priceOutsideEntryZone);
     }
     if (!liquidityReady) {
-      reasons.add(EntryReadinessReason.liquidityNotConfirmed);
+      addReason(EntryReadinessReason.liquidityNotConfirmed);
     }
     if (decision.qualityScores.stop < 70) {
-      reasons.add(EntryReadinessReason.stopQualityLow);
+      addReason(EntryReadinessReason.stopQualityLow);
     }
     if (decision.qualityScores.risk < 70) {
-      reasons.add(EntryReadinessReason.riskQualityLow);
+      addReason(EntryReadinessReason.riskQualityLow);
     }
     if (!directionReady) {
-      reasons.add(EntryReadinessReason.directionQualityLow);
+      addReason(EntryReadinessReason.directionQualityLow);
     }
+    final bool strictChecks = signal != null;
+    final SignalDirection? direction =
+        signal?.direction ??
+        switch (decision.decision) {
+          DecisionAction.long => SignalDirection.long,
+          DecisionAction.short => SignalDirection.short,
+          DecisionAction.wait => null,
+        };
+    final bool setupReady =
+        direction != null && decision.selectedStrategy.trim().isNotEmpty;
+    final bool entryZoneReady =
+        decision.entryLow > 0.0 && decision.entryHigh >= decision.entryLow;
+    final double conservativeEntry = direction == SignalDirection.short
+        ? decision.entryLow
+        : decision.entryHigh;
+    final double targetMovePercent = _movePercent(
+      direction: direction,
+      entry: conservativeEntry,
+      target: decision.tp1,
+    );
+    final double stopDistancePercent = conservativeEntry <= 0.0
+        ? 0.0
+        : (conservativeEntry - decision.stop).abs() / conservativeEntry * 100.0;
+    final double rawRiskReward = stopDistancePercent <= 0.0
+        ? 0.0
+        : targetMovePercent / stopDistancePercent;
+    final double spreadPercent = market.ticker.spreadPercent > 0.0
+        ? market.ticker.spreadPercent
+        : feeModel.estimatedSpreadPercent;
+    final double targetCostsPercent =
+        feeModel.feePercent(feeModel.entryOrderType) +
+        feeModel.feePercent(feeModel.targetExitOrderType) +
+        feeModel.entrySlippagePercent +
+        feeModel.targetSlippagePercent +
+        spreadPercent;
+    final double stopCostsPercent =
+        feeModel.feePercent(feeModel.entryOrderType) +
+        feeModel.feePercent(feeModel.stopOrderType) +
+        feeModel.entrySlippagePercent +
+        feeModel.stopSlippagePercent +
+        spreadPercent +
+        feeModel.safetyBufferPercent;
+    final double netRiskReward = stopDistancePercent + stopCostsPercent <= 0.0
+        ? 0.0
+        : (targetMovePercent - targetCostsPercent) /
+              (stopDistancePercent + stopCostsPercent);
+    final TimeframeAnalysis targetFrame = signal?.style == SignalStyle.scalp
+        ? market.oneMinute
+        : market.fifteenMinutes;
+    final double tickSize = market.tradingRules?.tickSize ?? 0.0;
+    final bool structuralTargetReady =
+        !strictChecks ||
+        (market.tradePlan.structuralTargetValid &&
+            direction != null &&
+            StructuralTargetEngine.isConfirmedTarget(
+              analysis: targetFrame,
+              direction: direction,
+              entryLow: decision.entryLow,
+              entryHigh: decision.entryHigh,
+              target: decision.tp1,
+              tickSize: tickSize,
+            ));
+    final StructuralObstacle? obstacle = direction == null
+        ? null
+        : StructuralTargetEngine.obstacleBeforeTarget(
+            analysis: targetFrame,
+            direction: direction,
+            entryLow: decision.entryLow,
+            entryHigh: decision.entryHigh,
+            target: decision.tp1,
+            tickSize: tickSize,
+          );
+    final bool structuralStopReady =
+        !strictChecks ||
+        (market.tradePlan.structuralStopValid &&
+            signal.structuralStop > 0.0 &&
+            signal.invalidationPrice > 0.0 &&
+            _stopOnCorrectSide(signal));
+    final double actualBuffer = signal == null
+        ? decision.stopBuffer
+        : (signal.stop - signal.invalidationPrice).abs();
+    final double requiredBuffer = _max4(
+      targetFrame.atr * TradingSafetyConfig.minStopAtrBuffer,
+      market.ticker.spread * TradingSafetyConfig.spreadBufferMultiplier,
+      conservativeEntry *
+          feeModel.stopSlippagePercent /
+          100.0 *
+          TradingSafetyConfig.slippageBufferMultiplier,
+      tickSize * TradingSafetyConfig.tickBufferMultiplier,
+    );
+    final bool stopBufferReady =
+        !strictChecks ||
+        (requiredBuffer > 0.0 &&
+            actualBuffer + tickSize * 0.1 >= requiredBuffer);
+    final DateTime evaluationTime = (evaluatedAt ?? market.updatedAt).toUtc();
+    final Duration maximumSignalAge = signal?.style == SignalStyle.scalp
+        ? TradingSafetyConfig.scalpSignalMaxAge
+        : TradingSafetyConfig.standardSignalMaxAge;
+    final bool signalFresh =
+        !strictChecks ||
+        (!evaluationTime.isBefore(signal.time.toUtc()) &&
+            evaluationTime.difference(signal.time.toUtc()) <= maximumSignalAge);
+    final bool spreadReady =
+        spreadPercent <= TradingSafetyConfig.maxReadySpreadPercent;
+    final bool historicalSamplesReady =
+        !strictChecks || signal.firstMove.hasEnoughSamples;
+    final double? firstMoveProbability = signal?.firstMove.probabilityFor(
+      TradingSafetyConfig.readinessProbabilityTargetPercent,
+    );
+    final bool probabilityReady =
+        !strictChecks ||
+        (historicalSamplesReady &&
+            firstMoveProbability != null &&
+            firstMoveProbability >=
+                TradingSafetyConfig.minReadyFirstMoveProbabilityPercent);
+    final bool marketContextReady = _marketContextReady(
+      market: market,
+      benchmarkMarket: benchmarkMarket,
+      direction: direction,
+      signal: signal,
+    );
+    final bool currentDirectionReady =
+        signal == null ||
+        (signal.direction == SignalDirection.long
+            ? decision.decision == DecisionAction.long
+            : decision.decision == DecisionAction.short);
+    if (strictChecks && !setupReady) {
+      addReason(EntryReadinessReason.setupMissing);
+    }
+    if (strictChecks && !entryZoneReady) {
+      addReason(EntryReadinessReason.entryZoneMissing);
+    }
+    if (strictChecks &&
+        targetMovePercent < TradingSafetyConfig.minReadyMovePercent) {
+      addReason(EntryReadinessReason.targetTooClose);
+    }
+    if (!structuralTargetReady) {
+      addReason(EntryReadinessReason.targetNotStructural);
+    }
+    if (obstacle != null) addReason(EntryReadinessReason.obstacleBeforeTarget);
+    if (!structuralStopReady) {
+      addReason(EntryReadinessReason.structuralStopMissing);
+    }
+    if (!stopBufferReady) addReason(EntryReadinessReason.stopTooTight);
+    if (strictChecks && netRiskReward < TradingSafetyConfig.minNetRiskReward) {
+      addReason(EntryReadinessReason.riskRewardTooLow);
+    }
+    if (strictChecks && !entryConfirmed) {
+      addReason(EntryReadinessReason.entryTriggerMissing);
+    }
+    if (!signalFresh) addReason(EntryReadinessReason.signalStale);
+    if (!liquidityReady || !market.dataIntegrity.hasFreshBidAsk) {
+      addReason(EntryReadinessReason.liquidityInvalid);
+    }
+    if (!marketContextReady || !currentDirectionReady) {
+      addReason(EntryReadinessReason.marketConflict);
+    }
+    if (!historicalSamplesReady) {
+      addReason(EntryReadinessReason.historicalSamplesLow);
+    } else if (!probabilityReady) {
+      addReason(EntryReadinessReason.firstMoveProbabilityLow);
+    }
+    if (!spreadReady) addReason(EntryReadinessReason.spreadTooWide);
+    final bool strictRiskReady =
+        riskReady &&
+        (!strictChecks ||
+            (structuralStopReady &&
+                stopBufferReady &&
+                rawRiskReward > 0.0 &&
+                netRiskReward >= TradingSafetyConfig.minNetRiskReward));
+    final bool strictEntryReady =
+        !strictChecks ||
+        (setupReady &&
+            entryZoneReady &&
+            targetMovePercent >= TradingSafetyConfig.minReadyMovePercent &&
+            structuralTargetReady &&
+            obstacle == null &&
+            signalFresh &&
+            spreadReady &&
+            historicalSamplesReady &&
+            probabilityReady &&
+            marketContextReady &&
+            currentDirectionReady);
     final bool entryReady =
         !hardBlocked &&
         entryConfirmed &&
@@ -157,19 +383,30 @@ class EntryReadinessGate {
         priceInZone &&
         liquidityReady &&
         riskReady &&
-        directionReady;
-    final bool dataSuspended = !marketDataReady || !microstructureReady;
+        directionReady &&
+        strictRiskReady &&
+        strictEntryReady;
+    final bool dataSuspended =
+        !marketDataReady || !microstructureReady || !signalFresh;
+    final bool structuralVeto =
+        strictChecks &&
+        (!structuralTargetReady ||
+            !structuralStopReady ||
+            !stopBufferReady ||
+            obstacle != null ||
+            targetMovePercent < TradingSafetyConfig.minReadyMovePercent ||
+            netRiskReward < TradingSafetyConfig.minNetRiskReward);
     final EntryReadinessStatus status = entryReady
         ? EntryReadinessStatus.entryReady
         : dataSuspended
         ? EntryReadinessStatus.suspended
-        : reasons.contains(EntryReadinessReason.hardBlock)
+        : reasons.contains(EntryReadinessReason.hardBlock) || structuralVeto
         ? EntryReadinessStatus.invalidated
         : _almostReady(
             entryConfirmed: entryConfirmed,
             priceInZone: priceInZone,
             liquidityReady: liquidityReady,
-            riskReady: riskReady,
+            riskReady: strictRiskReady,
             directionReady: directionReady,
           )
         ? EntryReadinessStatus.almostReady
@@ -178,7 +415,7 @@ class EntryReadinessGate {
         ? EntryNextAction.enter
         : dataSuspended
         ? EntryNextAction.waitForData
-        : reasons.contains(EntryReadinessReason.hardBlock)
+        : reasons.contains(EntryReadinessReason.hardBlock) || structuralVeto
         ? EntryNextAction.skip
         : !priceInZone
         ? EntryNextAction.waitForZone
@@ -186,7 +423,7 @@ class EntryReadinessGate {
         ? EntryNextAction.waitForConfirmation
         : !liquidityReady
         ? EntryNextAction.waitForLiquidity
-        : !riskReady
+        : !strictRiskReady
         ? EntryNextAction.waitForRisk
         : EntryNextAction.waitForDirection;
 
@@ -197,16 +434,93 @@ class EntryReadinessGate {
       nextAction: nextAction,
       reasons: List<EntryReadinessReason>.unmodifiable(reasons),
       dataQuality: decision.dataQuality,
-      hardBlocked: hardBlocked,
+      hardBlocked: hardBlocked || structuralVeto,
       marketDataReady: marketDataReady,
       microstructureReady: microstructureReady,
       entryConfirmed: entryConfirmed,
       priceInZone: priceInZone,
       liquidityReady: liquidityReady,
-      riskReady: riskReady,
+      riskReady: strictRiskReady,
       directionReady: directionReady,
       entryReady: entryReady,
+      targetMovePercent: targetMovePercent,
+      stopDistancePercent: stopDistancePercent,
+      rawRiskReward: rawRiskReward,
+      netRiskReward: netRiskReward,
+      structuralTargetReady: structuralTargetReady,
+      structuralStopReady: structuralStopReady,
+      stopBufferReady: stopBufferReady,
+      signalFresh: signalFresh,
+      marketContextReady: marketContextReady && currentDirectionReady,
+      spreadReady: spreadReady,
+      historicalSamples: signal?.firstMove.historicalSamples ?? 0,
+      historicalConfidence:
+          signal?.firstMove.historicalConfidence.code ?? 'INSUFFICIENT_DATA',
+      firstMoveProbability: firstMoveProbability,
+      firstMoveProbabilities: signal == null
+          ? const <double, double?>{}
+          : <double, double?>{
+              0.20: signal.firstMove.probability020,
+              0.30: signal.firstMove.probability030,
+              0.50: signal.firstMove.probability050,
+              0.75: signal.firstMove.probability075,
+              1.00: signal.firstMove.probability100,
+            },
+      stopFirstProbability: signal?.firstMove.probabilityStopFirst,
+      obstacleLabel: obstacle?.label,
     );
+  }
+
+  static double _movePercent({
+    required SignalDirection? direction,
+    required double entry,
+    required double target,
+  }) {
+    if (direction == null || entry <= 0.0 || target <= 0.0) return 0.0;
+    final double move = direction == SignalDirection.long
+        ? target - entry
+        : entry - target;
+    return move <= 0.0 ? 0.0 : move / entry * 100.0;
+  }
+
+  static bool _stopOnCorrectSide(RadarSignal signal) {
+    return signal.direction == SignalDirection.long
+        ? signal.stop < signal.entryLow &&
+              signal.invalidationPrice < signal.entryLow
+        : signal.stop > signal.entryHigh &&
+              signal.invalidationPrice > signal.entryHigh;
+  }
+
+  static bool _marketContextReady({
+    required MarketSnapshot market,
+    required MarketSnapshot? benchmarkMarket,
+    required SignalDirection? direction,
+    required RadarSignal? signal,
+  }) {
+    if (direction == null) return false;
+    final Bias opposite = direction == SignalDirection.long
+        ? Bias.bearish
+        : Bias.bullish;
+    if (signal != null &&
+        signal.trend15m == opposite &&
+        signal.trend1h == opposite) {
+      return false;
+    }
+    if (market.symbol == 'BTCUSDT') return true;
+    if (benchmarkMarket == null ||
+        benchmarkMarket.dataIntegrity.hasCriticalIssue) {
+      return false;
+    }
+    return !(benchmarkMarket.oneMinute.trend == opposite &&
+        benchmarkMarket.fifteenMinutes.trend == opposite);
+  }
+
+  static double _max4(double a, double b, double c, double d) {
+    double result = a;
+    if (b > result) result = b;
+    if (c > result) result = c;
+    if (d > result) result = d;
+    return result;
   }
 
   static bool _almostReady({
@@ -244,6 +558,22 @@ class EntryReadinessResult {
     required this.riskReady,
     required this.directionReady,
     required this.entryReady,
+    this.targetMovePercent = 0.0,
+    this.stopDistancePercent = 0.0,
+    this.rawRiskReward = 0.0,
+    this.netRiskReward = 0.0,
+    this.structuralTargetReady = true,
+    this.structuralStopReady = true,
+    this.stopBufferReady = true,
+    this.signalFresh = true,
+    this.marketContextReady = true,
+    this.spreadReady = true,
+    this.historicalSamples = 0,
+    this.historicalConfidence = 'INSUFFICIENT_DATA',
+    this.firstMoveProbability,
+    this.firstMoveProbabilities = const <double, double?>{},
+    this.stopFirstProbability,
+    this.obstacleLabel,
   });
 
   final String? signalId;
@@ -261,6 +591,22 @@ class EntryReadinessResult {
   final bool riskReady;
   final bool directionReady;
   final bool entryReady;
+  final double targetMovePercent;
+  final double stopDistancePercent;
+  final double rawRiskReward;
+  final double netRiskReward;
+  final bool structuralTargetReady;
+  final bool structuralStopReady;
+  final bool stopBufferReady;
+  final bool signalFresh;
+  final bool marketContextReady;
+  final bool spreadReady;
+  final int historicalSamples;
+  final String historicalConfidence;
+  final double? firstMoveProbability;
+  final Map<double, double?> firstMoveProbabilities;
+  final double? stopFirstProbability;
+  final String? obstacleLabel;
 
   List<String> get reasonCodes => reasons
       .map<String>((EntryReadinessReason reason) => reason.code)

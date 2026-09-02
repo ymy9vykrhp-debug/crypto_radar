@@ -197,6 +197,43 @@ void main() {
     );
     controller.dispose();
   });
+
+  test(
+    'post-entry critical conflict emits informational warning only',
+    () async {
+      final TradeAlertController controller = TradeAlertController(
+        ledger: TradeAlertEventLedger(storage: _MemoryStorage()),
+      );
+      await controller.initialize();
+      final RadarSignal confirmed = _signal(
+        id: 'managed',
+        stage: SignalStage.entryConfirmed,
+      );
+      final TradeAlert? ready = controller.evaluate(<RadarSignal>[
+        confirmed,
+      ], readiness: _ready('managed'));
+      expect(ready?.kind, TradeAlertKind.entryReady);
+      await controller.recordDelivery(ready!, successful: true);
+
+      final RadarSignal inPosition = confirmed.copyWith(
+        stage: SignalStage.inPosition,
+        status: SignalStatus.inPosition,
+      );
+      controller.prime(<RadarSignal>[confirmed]);
+      final List<TradeAlert> first = controller.evaluateEvents(<RadarSignal>[
+        inPosition,
+      ], readiness: _criticalNotReady('managed'));
+      expect(
+        first.map<TradeAlertKind>((TradeAlert alert) => alert.kind),
+        contains(TradeAlertKind.positionActive),
+      );
+      final TradeAlert? warning = controller.evaluate(<RadarSignal>[
+        inPosition,
+      ], readiness: _criticalNotReady('managed'));
+      expect(warning?.kind, TradeAlertKind.conditionsWorsened);
+      controller.dispose();
+    },
+  );
 }
 
 class _MemoryStorage implements LocalStorageBackend {
@@ -247,6 +284,25 @@ EntryReadinessResult _notReady(String signalId) => EntryReadinessResult(
   riskReady: true,
   directionReady: true,
   entryReady: false,
+);
+
+EntryReadinessResult _criticalNotReady(String signalId) => EntryReadinessResult(
+  signalId: signalId,
+  evaluatedAt: DateTime.utc(2026, 8, 26, 12),
+  status: EntryReadinessStatus.almostReady,
+  nextAction: EntryNextAction.waitForDirection,
+  reasons: const <EntryReadinessReason>[EntryReadinessReason.marketConflict],
+  dataQuality: DataQuality.high,
+  hardBlocked: false,
+  marketDataReady: true,
+  microstructureReady: true,
+  entryConfirmed: true,
+  priceInZone: false,
+  liquidityReady: true,
+  riskReady: true,
+  directionReady: false,
+  entryReady: false,
+  marketContextReady: false,
 );
 
 RadarSignal _signal({

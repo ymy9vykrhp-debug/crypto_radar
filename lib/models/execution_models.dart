@@ -318,6 +318,9 @@ class StopPlan {
     required this.safe,
     required this.quality,
     required this.reasonCodes,
+    this.structuralStopFound = true,
+    this.bufferComplete = true,
+    this.tooTight = false,
   });
 
   final StopVariant variant;
@@ -330,6 +333,9 @@ class StopPlan {
   final bool safe;
   final int quality;
   final List<String> reasonCodes;
+  final bool structuralStopFound;
+  final bool bufferComplete;
+  final bool tooTight;
 }
 
 class EntryAssessment {

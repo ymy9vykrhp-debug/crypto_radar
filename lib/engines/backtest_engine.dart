@@ -11,6 +11,7 @@ import '../services/historical_data_store.dart';
 import '../utils/exchange_decimal.dart';
 import 'decision_engine.dart';
 import 'execution_simulator.dart';
+import 'first_move_probability_engine.dart';
 import 'phase_a_engine.dart';
 import 'signal_engine.dart';
 import 'trade_outcome_classifier.dart';
@@ -27,6 +28,7 @@ class BacktestEngine {
   final BybitService bybitService;
   final TradeTracker tradeTracker;
   final HistoricalDataStore historicalDataStore;
+  static const FeeModel _feeModel = FeeModel();
 
   Future<BacktestReport> run(String symbol) async {
     final DateTime asOf = DateTime.now().toUtc();
@@ -148,7 +150,17 @@ class BacktestEngine {
           signals[signalIndex] = PhaseAEngine.update(
             market: snapshot,
             signal: signals[signalIndex],
+            feeModel: _feeModel,
           );
+          signals[signalIndex] =
+              FirstMoveProbabilityEngine.attachHistoricalProfile(
+                signal: signals[signalIndex],
+                historicalSignals: _profileHistory(
+                  signals,
+                  signals[signalIndex].executionProfileId,
+                ),
+                asOf: baseClose,
+              );
         }
       }
       final List<RadarSignal?> candidates = <RadarSignal?>[
@@ -176,12 +188,18 @@ class BacktestEngine {
               baseCandidate,
             ),
           );
-          final RadarSignal candidate = PhaseAEngine.prepare(
+          RadarSignal candidate = PhaseAEngine.prepare(
             market: snapshot,
             signal: enrichedCandidate,
             entryVariant: profile.entryVariant,
             stopVariant: profile.stopVariant,
             profileId: profile.id,
+            feeModel: _feeModel,
+          );
+          candidate = FirstMoveProbabilityEngine.attachHistoricalProfile(
+            signal: candidate,
+            historicalSignals: _profileHistory(signals, profile.id),
+            asOf: baseClose,
           );
           final String setupKey =
               '${profile.id}:${candidate.style.name}:'
@@ -257,7 +275,6 @@ class BacktestEngine {
     required List<Candle> candles,
     required InstrumentTradingRules tradingRules,
   }) {
-    const FeeModel feeModel = FeeModel();
     final double quantity = _standardizedQuantity(signal, tradingRules);
     final ExecutionSimulationResult result = ExecutionSimulator.simulate(
       ExecutionSimulationInput(
@@ -265,7 +282,7 @@ class BacktestEngine {
         candles: candles,
         quantity: quantity,
         instrumentRules: tradingRules,
-        feeModel: feeModel,
+        feeModel: _feeModel,
         entryOrderType: SimulationOrderType.market,
         targetOrderType: SimulationOrderType.market,
         stopOrderType: SimulationOrderType.market,
@@ -368,4 +385,11 @@ class BacktestEngine {
     }
     return low >= candles.length ? const <Candle>[] : candles.sublist(low);
   }
+
+  Iterable<RadarSignal> _profileHistory(
+    Iterable<RadarSignal> signals,
+    String profileId,
+  ) => signals.where(
+    (RadarSignal signal) => signal.executionProfileId == profileId,
+  );
 }

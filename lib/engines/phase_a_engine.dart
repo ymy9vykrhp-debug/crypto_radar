@@ -1,6 +1,7 @@
 import '../models/execution_models.dart';
 import '../models/market_data_models.dart';
 import '../models/market_models.dart';
+import '../models/position_calculator_models.dart';
 import '../models/signal_models.dart';
 import 'entry_engine.dart';
 import 'false_breakout_engine.dart';
@@ -15,6 +16,7 @@ class PhaseAEngine {
     EntryVariant entryVariant = EntryVariant.bosConfirmation,
     StopVariant stopVariant = StopVariant.structuralAtr,
     String profileId = 'live_confirmed',
+    FeeModel feeModel = const FeeModel(),
   }) {
     final TimeframeAnalysis trigger = _triggerAnalysis(market, signal);
     final FalseBreakoutAnalysis falseBreakout = FalseBreakoutEngine.analyze(
@@ -27,6 +29,8 @@ class PhaseAEngine {
       falseBreakout: falseBreakout,
       variant: stopVariant,
       tradingRules: market.tradingRules,
+      observedSpread: market.ticker.spread,
+      feeModel: feeModel,
     );
     final EntryAssessment entry = EntryEngine.assess(
       signal: signal,
@@ -95,6 +99,10 @@ class PhaseAEngine {
           ? 'NO TRADE: критические рыночные данные отсутствуют или устарели.'
           : entryVariant.mode == EntryMode.aggressive
           ? entry.action
+          : !stopPlan.structuralStopFound
+          ? 'NO TRADE: структурная отмена сетапа не определена.'
+          : stopPlan.tooTight
+          ? 'NO TRADE: Stop слишком близко к структурной отмене.'
           : stopPlan.safe
           ? 'SETUP FOUND: ждём зону и подтверждающий триггер.'
           : 'NO TRADE: безопасный Stop слишком далеко или R:R слабый.',
@@ -110,6 +118,7 @@ class PhaseAEngine {
   static RadarSignal update({
     required MarketSnapshot market,
     required RadarSignal signal,
+    FeeModel feeModel = const FeeModel(),
   }) {
     if (signal.status != SignalStatus.waitingEntry ||
         signal.stage == SignalStage.entryConfirmed) {
@@ -126,6 +135,8 @@ class PhaseAEngine {
       falseBreakout: falseBreakout,
       variant: signal.stopVariant,
       tradingRules: market.tradingRules,
+      observedSpread: market.ticker.spread,
+      feeModel: feeModel,
     );
     final EntryAssessment entry = EntryEngine.assess(
       signal: signal,
@@ -182,6 +193,10 @@ class PhaseAEngine {
       stopIsSafe: stopPlan.safe && !dataBlocked,
       executionAction: dataBlocked
           ? 'NO TRADE: критические рыночные данные отсутствуют или устарели.'
+          : !stopPlan.structuralStopFound
+          ? 'NO TRADE: структурная отмена сетапа не определена.'
+          : stopPlan.tooTight
+          ? 'NO TRADE: Stop слишком близко к структурной отмене.'
           : entry.action,
       falseBreakoutState: falseBreakout.state,
       falseBreakoutLevel: falseBreakout.level,
@@ -195,9 +210,14 @@ class PhaseAEngine {
   static RadarSignal preview({
     required MarketSnapshot market,
     required RadarSignal signal,
+    FeeModel feeModel = const FeeModel(),
   }) {
-    final RadarSignal prepared = prepare(market: market, signal: signal);
-    return update(market: market, signal: prepared);
+    final RadarSignal prepared = prepare(
+      market: market,
+      signal: signal,
+      feeModel: feeModel,
+    );
+    return update(market: market, signal: prepared, feeModel: feeModel);
   }
 
   static TimeframeAnalysis _triggerAnalysis(

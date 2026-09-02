@@ -61,11 +61,15 @@ class RiskRewardTable extends StatelessWidget {
                   _TableCellText(option.label),
                   _TableCellText(_price(option.targetPrice)),
                   _TableCellText(
-                    '${option.probabilityPercent.toStringAsFixed(1)}%',
+                    option.hasHistoricalProbability
+                        ? '${option.probabilityPercent.toStringAsFixed(1)}%'
+                        : 'н/д',
                   ),
                   _TableCellText(
-                    '${option.expectedR >= 0.0 ? '+' : ''}'
-                    '${option.expectedR.toStringAsFixed(2)}R',
+                    option.hasHistoricalProbability
+                        ? '${option.expectedR >= 0.0 ? '+' : ''}'
+                              '${option.expectedR.toStringAsFixed(2)}R'
+                        : '—',
                   ),
                   _TableCellText(
                     option.rewardMultiple == recommended
@@ -79,8 +83,8 @@ class RiskRewardTable extends StatelessWidget {
         ),
         const SizedBox(height: 7),
         const Text(
-          '* Оценка алгоритма по качеству текущего сигнала, не гарантия. '
-          'Плечо увеличивает и прибыль, и убыток; предел — 10×.',
+          '* Только статистика завершённых похожих наблюдений. Если выборки '
+          'недостаточно или цель выше 1%, вероятность не выдумывается.',
           style: TextStyle(color: Colors.white38, fontSize: 11),
         ),
       ],

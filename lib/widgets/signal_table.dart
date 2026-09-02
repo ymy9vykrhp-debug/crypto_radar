@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../localization/app_strings.dart';
 import '../models/execution_models.dart';
+import '../models/first_move_models.dart';
 import '../models/signal_models.dart';
 import '../theme/app_theme.dart';
 import 'product_components.dart';
@@ -293,6 +294,50 @@ class _SignalTableState extends State<SignalTable> {
                   ],
                 ),
                 _DetailGroup(
+                  title: strings.pick('Первое движение', 'First Move'),
+                  icon: Icons.insights_rounded,
+                  rows: <MapEntry<String, String>>[
+                    MapEntry(
+                      'Historical samples',
+                      '${signal.firstMove.historicalSamples} · ${signal.firstMove.historicalConfidence.code}',
+                    ),
+                    MapEntry(
+                      '+0.20% before Stop',
+                      _probability(signal.firstMove.probability020),
+                    ),
+                    MapEntry(
+                      '+0.30% before Stop',
+                      _probability(signal.firstMove.probability030),
+                    ),
+                    MapEntry(
+                      '+0.50% before Stop',
+                      _probability(signal.firstMove.probability050),
+                    ),
+                    MapEntry(
+                      '+0.75% before Stop',
+                      _probability(signal.firstMove.probability075),
+                    ),
+                    MapEntry(
+                      '+1.00% before Stop',
+                      _probability(signal.firstMove.probability100),
+                    ),
+                    MapEntry(
+                      'Stop First',
+                      _probability(signal.firstMove.probabilityStopFirst),
+                    ),
+                    MapEntry(
+                      'Observed outcome',
+                      signal.firstMove.observationComplete
+                          ? '0.20 ${signal.firstMove.hit020 ? '✓' : '×'} · '
+                                '0.30 ${signal.firstMove.hit030 ? '✓' : '×'} · '
+                                '0.50 ${signal.firstMove.hit050 ? '✓' : '×'} · '
+                                '1.00 ${signal.firstMove.hit100 ? '✓' : '×'} · '
+                                'STOP FIRST ${signal.firstMove.stopHitFirst ? 'YES' : 'NO'}'
+                          : 'IN PROGRESS',
+                    ),
+                  ],
+                ),
+                _DetailGroup(
                   title: strings.pick('Хронология', 'Timeline'),
                   icon: Icons.timeline_rounded,
                   rows: <MapEntry<String, String>>[
@@ -493,6 +538,9 @@ String _price(double value) {
   if (value >= 1) return value.toStringAsFixed(4);
   return value.toStringAsFixed(6);
 }
+
+String _probability(double? value) =>
+    value == null ? 'ДАННЫХ НЕДОСТАТОЧНО' : '${value.toStringAsFixed(1)}%';
 
 String _resultLabel(RadarSignal signal) {
   if (signal.status.isActive) return 'ACTIVE';

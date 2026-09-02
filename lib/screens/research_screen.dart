@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../localization/app_strings.dart';
 import '../models/backtest_models.dart';
+import '../models/first_move_models.dart';
 import '../services/journal_controller.dart';
 import '../widgets/product_components.dart';
 
@@ -9,6 +10,7 @@ enum ResearchView {
   backtest,
   strategies,
   factors,
+  firstMove,
   whatIf,
   paperTrading,
   selfAnalysis,
@@ -96,6 +98,8 @@ class _ResearchScreenState extends State<ResearchScreen> {
         return _StrategyComparison(report: selected);
       case ResearchView.factors:
         return _FactorAnalysis(report: selected);
+      case ResearchView.firstMove:
+        return _FirstMoveAnalysis(report: selected);
       case ResearchView.whatIf:
         return _PlannedResearchPanel(
           icon: Icons.tune_rounded,
@@ -149,6 +153,7 @@ class _ResearchNavigation extends StatelessWidget {
       ResearchView.backtest: 'Backtest',
       ResearchView.strategies: strings.pick('Стратегии', 'Strategies'),
       ResearchView.factors: strings.pick('Факторы', 'Factors'),
+      ResearchView.firstMove: 'First Move',
       ResearchView.whatIf: 'What-if',
       ResearchView.paperTrading: 'Paper Trading',
       ResearchView.selfAnalysis: strings.pick('Самоанализ', 'Self Analysis'),
@@ -379,6 +384,145 @@ class _FactorAnalysis extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _FirstMoveAnalysis extends StatelessWidget {
+  const _FirstMoveAnalysis({required this.report});
+
+  final BacktestReport? report;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppStrings strings = context.strings;
+    if (report == null) {
+      return ProductEmptyState(
+        icon: Icons.insights_rounded,
+        title: strings.noData,
+        message: strings.pick(
+          'Сначала запустите backtest.',
+          'Run a backtest first.',
+        ),
+      );
+    }
+    final List<FirstMoveHistoricalBucket> buckets = report!.firstMoveBuckets;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        SectionHeading(
+          title: '${report!.symbol} · First Move Probability',
+          subtitle: strings.pick(
+            'Вероятность достижения движения раньше структурного Stop. Только завершённые наблюдения, без будущих данных.',
+            'Probability of reaching a move before the structural Stop. Completed observations only, without future data.',
+          ),
+          icon: Icons.insights_rounded,
+        ),
+        const SizedBox(height: 12),
+        if (buckets.isEmpty)
+          ProductEmptyState(
+            icon: Icons.hourglass_empty_rounded,
+            title: strings.pick(
+              'Пока нет завершённых наблюдений',
+              'No completed observations yet',
+            ),
+            message: strings.pick(
+              'Нужны минимум 50 похожих наблюдений в одной группе.',
+              'At least 50 similar observations are required in one group.',
+            ),
+          )
+        else
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columns: const <DataColumn>[
+                  DataColumn(label: Text('Side')),
+                  DataColumn(label: Text('Mode')),
+                  DataColumn(label: Text('Regime')),
+                  DataColumn(label: Text('Volatility')),
+                  DataColumn(label: Text('Stop')),
+                  DataColumn(label: Text('Samples'), numeric: true),
+                  DataColumn(label: Text('0.20%'), numeric: true),
+                  DataColumn(label: Text('0.30%'), numeric: true),
+                  DataColumn(label: Text('0.50%'), numeric: true),
+                  DataColumn(label: Text('0.75%'), numeric: true),
+                  DataColumn(label: Text('1.00%'), numeric: true),
+                  DataColumn(label: Text('Stop first'), numeric: true),
+                ],
+                rows: buckets
+                    .map<DataRow>(
+                      (FirstMoveHistoricalBucket bucket) => DataRow(
+                        cells: <DataCell>[
+                          DataCell(Text(bucket.direction)),
+                          DataCell(Text(bucket.tradingMode)),
+                          DataCell(Text(bucket.marketRegime)),
+                          DataCell(Text(bucket.volatilityRegime)),
+                          DataCell(Text(bucket.stopDistanceBucket)),
+                          DataCell(Text(bucket.samples.toString())),
+                          DataCell(Text(_bucketPercent(bucket, 0.20))),
+                          DataCell(Text(_bucketPercent(bucket, 0.30))),
+                          DataCell(Text(_bucketPercent(bucket, 0.50))),
+                          DataCell(Text(_bucketPercent(bucket, 0.75))),
+                          DataCell(Text(_bucketPercent(bucket, 1.00))),
+                          DataCell(
+                            Text(
+                              bucket.samples == 0
+                                  ? '—'
+                                  : '${(bucket.stopFirst / bucket.samples * 100).toStringAsFixed(1)}%',
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                    .toList(growable: false),
+              ),
+            ),
+          ),
+        const SizedBox(height: 14),
+        SectionHeading(
+          title: strings.pick('Калибровка', 'Calibration'),
+          subtitle: strings.pick(
+            'Если система пишет 70–75%, фактический успех должен быть близок к этому диапазону.',
+            'When the system says 70–75%, actual success should be close to that range.',
+          ),
+          icon: Icons.rule_rounded,
+        ),
+        const SizedBox(height: 10),
+        Card(
+          clipBehavior: Clip.antiAlias,
+          child: DataTable(
+            columns: const <DataColumn>[
+              DataColumn(label: Text('Predicted')),
+              DataColumn(label: Text('Actual'), numeric: true),
+              DataColumn(label: Text('Samples'), numeric: true),
+            ],
+            rows: report!.calibrationBuckets
+                .map<DataRow>(
+                  (ProbabilityCalibrationBucket bucket) => DataRow(
+                    cells: <DataCell>[
+                      DataCell(Text('${bucket.label}%')),
+                      DataCell(
+                        Text(
+                          bucket.samples == 0
+                              ? '—'
+                              : '${bucket.actualSuccessPercent.toStringAsFixed(1)}%',
+                        ),
+                      ),
+                      DataCell(Text(bucket.samples.toString())),
+                    ],
+                  ),
+                )
+                .toList(growable: false),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _bucketPercent(FirstMoveHistoricalBucket bucket, double threshold) {
+    if (bucket.samples < 50) return 'н/д (${bucket.samples}/50)';
+    return '${bucket.probabilityFor(threshold).toStringAsFixed(1)}%';
   }
 }
 

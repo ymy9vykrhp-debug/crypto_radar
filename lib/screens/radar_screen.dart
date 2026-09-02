@@ -93,6 +93,7 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
     _journalController = JournalController(
       store: JournalStore(),
       backtestEngine: BacktestEngine(bybitService: _repository),
+      feeModelProvider: () => widget.preferences.feeModel,
     );
     _journalReady = _journalController.initialize();
     _tradeAlertController = TradeAlertController();
@@ -161,7 +162,7 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
               (CryptoAsset asset) => asset.symbol,
             );
       final Map<String, MarketSnapshot> results = await _multiAssetMonitor
-          .refresh(<String>[requestedSymbol, ...scannerSymbols]);
+          .refresh(<String>['BTCUSDT', requestedSymbol, ...scannerSymbols]);
       if (!mounted) return;
       final MarketSnapshot? selectedResult = results[requestedSymbol];
       if (_selectedSymbol == requestedSymbol && selectedResult != null) {
@@ -185,7 +186,10 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
     await _tradeAlertsReady;
     if (!mounted) return;
     _tradeAlertController.prime(_journalController.signals);
-    await _journalController.processLiveSnapshot(snapshot);
+    await _journalController.processLiveSnapshot(
+      snapshot,
+      benchmarkMarket: _multiAssetMonitor.latestSnapshotFor('BTCUSDT'),
+    );
     if (!mounted) return;
     final DecisionReadinessAnalysis analysis = _analysisFor(snapshot);
     final List<TradeAlert> alerts = _tradeAlertController.evaluateEvents(
@@ -400,6 +404,8 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
     return DecisionReadinessEngine.evaluate(
       market: snapshot,
       trackedSignals: _journalController.signals,
+      benchmarkMarket: _multiAssetMonitor.latestSnapshotFor('BTCUSDT'),
+      feeModel: widget.preferences.feeModel,
     );
   }
 
@@ -703,6 +709,10 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
                       journalController: _journalController,
                       bybitService: _repository,
                       livePrice: _livePrice,
+                      benchmarkMarket: _multiAssetMonitor.latestSnapshotFor(
+                        'BTCUSDT',
+                      ),
+                      feeModel: widget.preferences.feeModel,
                       selected: _workspaceSection,
                       onCalculateTrade: () =>
                           _openPositionCalculator(_snapshot!),

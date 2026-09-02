@@ -2,6 +2,7 @@ import 'package:crypto_radar/engines/entry_readiness_gate.dart';
 import 'package:crypto_radar/engines/decision_readiness_engine.dart';
 import 'package:crypto_radar/models/decision_models.dart';
 import 'package:crypto_radar/models/execution_models.dart';
+import 'package:crypto_radar/models/first_move_models.dart';
 import 'package:crypto_radar/models/market_data_models.dart';
 import 'package:crypto_radar/models/market_models.dart';
 import 'package:crypto_radar/models/signal_models.dart';
@@ -75,8 +76,130 @@ void main() {
       expect(analysis.readiness.signalId, tracked.id);
       expect(analysis.decision.signalStage, SignalStage.entryConfirmed);
     });
+
+    test('strict gate accepts a structural plan with historical edge', () {
+      final RadarSignal signal = _strictSignal();
+      final EntryReadinessResult result = EntryReadinessGate.evaluate(
+        market: _market(),
+        decision: _decision(stop: 98.2, tp1: 108, tp2: 110),
+        signal: signal,
+        signalId: signal.id,
+      );
+
+      expect(result.entryReady, isTrue);
+      expect(result.targetMovePercent, greaterThanOrEqualTo(1.0));
+      expect(result.netRiskReward, greaterThanOrEqualTo(1.8));
+      expect(result.historicalSamples, 80);
+    });
+
+    test('strict gate rejects a target below one percent', () {
+      final RadarSignal signal = _strictSignal().copyWith(
+        tp1: 100.8,
+        tp2: 101.0,
+      );
+      final EntryReadinessResult result = EntryReadinessGate.evaluate(
+        market: _market(),
+        decision: _decision(stop: 98.2, tp1: 100.8, tp2: 101.0),
+        signal: signal,
+      );
+
+      expect(result.entryReady, isFalse);
+      expect(result.reasonCodes, contains('TARGET_TOO_CLOSE'));
+    });
+
+    test('strict gate rejects missing structural stop', () {
+      final RadarSignal signal = _strictSignal().copyWith(
+        structuralStop: 0,
+        invalidationPrice: 0,
+      );
+      final EntryReadinessResult result = EntryReadinessGate.evaluate(
+        market: _market(),
+        decision: _decision(stop: 98.2, tp1: 108, tp2: 110),
+        signal: signal,
+      );
+
+      expect(result.entryReady, isFalse);
+      expect(result.reasonCodes, contains('STRUCTURAL_STOP_MISSING'));
+    });
+
+    test('strict gate fails closed on insufficient historical samples', () {
+      final RadarSignal signal = _strictSignal().copyWith(
+        firstMove: const FirstMoveRecord(
+          tradingMode: 'INTRADAY',
+          marketRegime: 'TREND_UP',
+          volatilityRegime: 'NORMAL',
+          historicalSamples: 49,
+          probability030: 99,
+        ),
+      );
+      final EntryReadinessResult result = EntryReadinessGate.evaluate(
+        market: _market(),
+        decision: _decision(stop: 98.2, tp1: 108, tp2: 110),
+        signal: signal,
+      );
+
+      expect(result.entryReady, isFalse);
+      expect(result.reasonCodes, contains('HISTORICAL_SAMPLES_LOW'));
+    });
   });
 }
+
+RadarSignal _strictSignal() => RadarSignal(
+  id: 'strict-ready',
+  symbol: 'BTCUSDT',
+  time: DateTime.utc(2026, 8, 31, 11, 55),
+  direction: SignalDirection.long,
+  referencePrice: 100,
+  entryLow: 99,
+  entryHigh: 101,
+  stop: 98.2,
+  tp1: 108,
+  tp2: 110,
+  score: 90,
+  trend5m: Bias.bullish,
+  trend15m: Bias.bullish,
+  trend1h: Bias.bullish,
+  rsi: 55,
+  macd: 1,
+  ema20: 101,
+  ema50: 99,
+  ema200: 95,
+  relativeVolume: 1.4,
+  rvolBias: Bias.bullish,
+  fvgBias: Bias.bullish,
+  orderBlockBias: Bias.bullish,
+  liquidityBias: Bias.bullish,
+  bos: Bias.bullish,
+  choch: Bias.neutral,
+  stage: SignalStage.entryConfirmed,
+  entryConfirmedTime: DateTime.utc(2026, 8, 31, 12),
+  structuralStop: 98.5,
+  invalidationPrice: 98.5,
+  stopBuffer: 0.3,
+  stopBufferAtr: 0.3,
+  qualities: const SignalQualityScores(
+    direction: 90,
+    entry: 85,
+    location: 85,
+    liquidity: 80,
+    stop: 80,
+    risk: 80,
+  ),
+  liquiditySweepConfirmed: true,
+  firstMove: const FirstMoveRecord(
+    tradingMode: 'INTRADAY',
+    marketRegime: 'TREND_UP',
+    volatilityRegime: 'NORMAL',
+    historicalSamples: 80,
+    historicalConfidence: HistoricalConfidence.low,
+    probability020: 86,
+    probability030: 78,
+    probability050: 71,
+    probability075: 64,
+    probability100: 58,
+    probabilityStopFirst: 22,
+  ),
+);
 
 RadarSignal _trackedSignal() => RadarSignal(
   id: 'BTCUSDT:standard:long:1:learned_best',
@@ -180,6 +303,9 @@ MarketSnapshot _market({bool freshData = true}) {
 DecisionSnapshot _decision({
   double price = 100,
   String executionAction = 'ENTRY READY',
+  double stop = 97,
+  double tp1 = 104,
+  double tp2 = 108,
 }) => DecisionSnapshot(
   symbol: 'BTCUSDT',
   timestamp: DateTime.utc(2026, 8, 31, 12),
@@ -191,9 +317,9 @@ DecisionSnapshot _decision({
   entryDecision: EntryDecision.enterNow,
   entryLow: 99,
   entryHigh: 101,
-  stop: 97,
-  tp1: 104,
-  tp2: 108,
+  stop: stop,
+  tp1: tp1,
+  tp2: tp2,
   riskReward: 2,
   leverage: 4,
   expectedMovePercent: 4,

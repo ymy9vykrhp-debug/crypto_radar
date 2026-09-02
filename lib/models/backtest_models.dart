@@ -1,6 +1,8 @@
 import 'market_models.dart';
 import 'execution_models.dart';
+import 'first_move_models.dart';
 import 'signal_models.dart';
+import '../engines/first_move_probability_engine.dart';
 
 class FactorPerformance {
   const FactorPerformance({
@@ -195,6 +197,8 @@ class BacktestReport {
     this.strategies = const <StrategyPerformance>[],
     this.reasonCodes = const <FactorPerformance>[],
     this.executionComparisons = const <ExecutionPerformance>[],
+    this.firstMoveBuckets = const <FirstMoveHistoricalBucket>[],
+    this.calibrationBuckets = const <ProbabilityCalibrationBucket>[],
   });
 
   final String symbol;
@@ -226,6 +230,8 @@ class BacktestReport {
   final List<StrategyPerformance> strategies;
   final List<FactorPerformance> reasonCodes;
   final List<ExecutionPerformance> executionComparisons;
+  final List<FirstMoveHistoricalBucket> firstMoveBuckets;
+  final List<ProbabilityCalibrationBucket> calibrationBuckets;
 
   factory BacktestReport.fromSignals({
     required String symbol,
@@ -355,6 +361,12 @@ class BacktestReport {
       strategies: _strategyPerformance(primarySignals),
       reasonCodes: _reasonCodePerformance(finished),
       executionComparisons: _executionPerformance(source),
+      firstMoveBuckets: FirstMoveProbabilityEngine.buildHistoricalBuckets(
+        primarySignals,
+      ),
+      calibrationBuckets: FirstMoveProbabilityEngine.buildCalibrationBuckets(
+        primarySignals,
+      ),
     );
   }
 
@@ -404,6 +416,16 @@ class BacktestReport {
           (ExecutionPerformance comparison) => comparison.toJson(),
         )
         .toList(growable: false),
+    'firstMoveBuckets': firstMoveBuckets
+        .map<Map<String, Object?>>(
+          (FirstMoveHistoricalBucket bucket) => bucket.toJson(),
+        )
+        .toList(growable: false),
+    'calibrationBuckets': calibrationBuckets
+        .map<Map<String, Object?>>(
+          (ProbabilityCalibrationBucket bucket) => bucket.toJson(),
+        )
+        .toList(growable: false),
   };
 
   factory BacktestReport.fromJson(Map<String, dynamic> json) {
@@ -411,6 +433,8 @@ class BacktestReport {
     final Object? rawStrategies = json['strategies'];
     final Object? rawReasonCodes = json['reasonCodes'];
     final Object? rawExecutionComparisons = json['executionComparisons'];
+    final Object? rawFirstMoveBuckets = json['firstMoveBuckets'];
+    final Object? rawCalibrationBuckets = json['calibrationBuckets'];
     return BacktestReport(
       symbol: json['symbol']?.toString() ?? '',
       startedAt:
@@ -477,6 +501,22 @@ class BacktestReport {
                 .map<ExecutionPerformance>(ExecutionPerformance.fromJson)
                 .toList(growable: false)
           : const <ExecutionPerformance>[],
+      firstMoveBuckets: rawFirstMoveBuckets is List<dynamic>
+          ? rawFirstMoveBuckets
+                .whereType<Map<String, dynamic>>()
+                .map<FirstMoveHistoricalBucket>(
+                  FirstMoveHistoricalBucket.fromJson,
+                )
+                .toList(growable: false)
+          : const <FirstMoveHistoricalBucket>[],
+      calibrationBuckets: rawCalibrationBuckets is List<dynamic>
+          ? rawCalibrationBuckets
+                .whereType<Map<String, dynamic>>()
+                .map<ProbabilityCalibrationBucket>(
+                  ProbabilityCalibrationBucket.fromJson,
+                )
+                .toList(growable: false)
+          : const <ProbabilityCalibrationBucket>[],
     );
   }
 }

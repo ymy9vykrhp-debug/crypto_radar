@@ -15,24 +15,49 @@ String formatTelegramRelayMessage(Map<String, dynamic> payload) {
       directionIcon: directionIcon,
     );
   }
+  if (!_completeEntryReadyPayload(payload)) {
+    return <String>[
+      '⚪ ДАННЫХ НЕДОСТАТОЧНО',
+      '',
+      '$symbol · вход не разрешён',
+      'Telegram получил неполный торговый план.',
+      'Действие: дождаться нового подтверждённого сигнала.',
+      '',
+      'Crypto Radar · LOCAL MONITOR ONLY',
+      'Ордер не отправлен.',
+    ].join('\n');
+  }
   final String confirmed = _displayTime(payload['confirmedAt']);
   final String age = _displayAge(payload['setupAgeSeconds']);
+  String probability(String key) =>
+      '${double.parse(payload[key].toString()).toStringAsFixed(1)}%';
   return <String>[
-    '🚨 ВХОД РАЗРЕШЁН',
+    '🚨 ВХОД ПОДТВЕРЖДЁН',
     '',
     '$directionIcon $symbol · $direction',
     '',
     '⭐ Setup Quality: ${payload['score'] ?? '—'}/100',
     'Совпадение факторов, не вероятность прибыли.',
+    'Режим: ${payload['tradingMode']} · ${payload['marketRegime']}',
     '',
     '🎯 Entry Zone: ${payload['entryLowText'] ?? '—'} — ${payload['entryHighText'] ?? '—'}',
     '🛑 Structural Stop: ${payload['stopText'] ?? '—'}',
     'Stop distance: ${payload['stopDistancePercentText'] ?? '—'}',
     '',
     '💰 TP1: ${payload['tp1Text'] ?? '—'}',
-    '⚖️ Raw R:R TP1: ${payload['riskRewardTp1Text'] ?? '—'}',
+    'Ожидаемый ход: ${payload['expectedMovePercentText']}',
+    '⚖️ Net R:R: ${payload['netRiskRewardText']}',
     '💰 TP2: ${payload['tp2Text'] ?? '—'}',
     '⚖️ Raw R:R TP2: ${payload['riskRewardTp2Text'] ?? '—'}',
+    '',
+    '🎯 Историческая вероятность первого движения:',
+    '0.20% → ${probability('firstMoveProbability020')}',
+    '0.30% → ${probability('firstMoveProbability030')}',
+    '0.50% → ${probability('firstMoveProbability050')}',
+    '0.75% → ${probability('firstMoveProbability075')}',
+    '1.00% → ${probability('firstMoveProbability100')}',
+    'Stop First → ${probability('stopFirstProbability')}',
+    'Похожие наблюдения: ${payload['historicalSamples']} · ${payload['historicalConfidence']}',
     '',
     '📊 Direction: ${payload['directionQuality'] ?? '—'}/100',
     '🎯 Entry Quality: ${payload['entryQuality'] ?? '—'}/100',
@@ -53,6 +78,36 @@ String formatTelegramRelayMessage(Map<String, dynamic> payload) {
   ].join('\n');
 }
 
+bool _completeEntryReadyPayload(Map<String, dynamic> payload) {
+  final String symbol = payload['symbol']?.toString().trim() ?? '';
+  final String direction = payload['direction']?.toString() ?? '';
+  double? number(String key) => double.tryParse(payload[key]?.toString() ?? '');
+  final int samples =
+      int.tryParse(payload['historicalSamples']?.toString() ?? '') ?? 0;
+  final List<String> positivePrices = <String>[
+    'entryLow',
+    'entryHigh',
+    'stop',
+    'tp1',
+    'tp2',
+  ];
+  return symbol.isNotEmpty &&
+      (direction == 'LONG' || direction == 'SHORT') &&
+      positivePrices.every((String key) => (number(key) ?? 0.0) > 0.0) &&
+      (number('expectedMovePercent') ?? 0.0) >= 1.0 &&
+      (number('netRiskReward') ?? 0.0) >= 1.8 &&
+      samples >= 50 &&
+      (number('firstMoveProbability030') ?? 0.0) >= 70.0 &&
+      <String>[
+        'firstMoveProbability020',
+        'firstMoveProbability030',
+        'firstMoveProbability050',
+        'firstMoveProbability075',
+        'firstMoveProbability100',
+        'stopFirstProbability',
+      ].every((String key) => number(key) != null);
+}
+
 String _formatLifecycleEvent(
   Map<String, dynamic> payload, {
   required String kind,
@@ -63,6 +118,7 @@ String _formatLifecycleEvent(
   final String title = switch (kind) {
     'SIGNAL_INVALIDATED' => '❌ СИГНАЛ ОТМЕНЁН',
     'ENTRY_SUSPENDED' => '⏸ РАЗРЕШЕНИЕ ПРИОСТАНОВЛЕНО',
+    'CONDITIONS_WORSENED' => '⚠️ УСЛОВИЯ УХУДШИЛИСЬ',
     'POSITION_ACTIVE' => '✅ ВХОД СОСТОЯЛСЯ',
     'TP1_HIT' => '🎯 TP1 ДОСТИГНУТ',
     'TP2_HIT' => '🏆 TP2 ДОСТИГНУТ',
@@ -76,7 +132,9 @@ String _formatLifecycleEvent(
     '',
     '$directionIcon $symbol · $direction',
   ];
-  if (kind == 'SIGNAL_INVALIDATED' || kind == 'ENTRY_SUSPENDED') {
+  if (kind == 'SIGNAL_INVALIDATED' ||
+      kind == 'ENTRY_SUSPENDED' ||
+      kind == 'CONDITIONS_WORSENED') {
     final Object? rawReasons = payload['reasonCodes'];
     final String reasons = rawReasons is List<dynamic> && rawReasons.isNotEmpty
         ? rawReasons.join(', ')
@@ -85,7 +143,9 @@ String _formatLifecycleEvent(
       '',
       'Статус: ${payload['stage'] ?? '—'}',
       'Причины: $reasons',
-      'Действие: не входить до нового ENTRY READY.',
+      kind == 'CONDITIONS_WORSENED'
+          ? 'Действие: рассмотреть фиксацию или защиту позиции. Автозакрытие отключено.'
+          : 'Действие: не входить до нового ENTRY READY.',
     ]);
   } else {
     lines.addAll(<String>[

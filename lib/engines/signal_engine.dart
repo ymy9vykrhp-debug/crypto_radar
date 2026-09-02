@@ -1,7 +1,10 @@
 import '../models/market_data_models.dart';
+import '../models/first_move_models.dart';
 import '../models/market_models.dart';
 import '../models/signal_models.dart';
 import 'market_data_integrity_engine.dart';
+import 'stop_engine.dart';
+import 'structural_target_engine.dart';
 
 class SignalEngine {
   const SignalEngine._();
@@ -62,6 +65,7 @@ class SignalEngine {
     final TradePlan tradePlan = _createTradePlan(
       analysis: fifteen,
       bias: planBias,
+      tickSize: tradingRules?.tickSize ?? 0.0,
     );
     final TickerStats preservedTicker = ticker.copyWith(price: price);
     final MarketDataIntegrity dataIntegrity = MarketDataIntegrityEngine.assess(
@@ -158,6 +162,14 @@ class SignalEngine {
       choch: analysis.structure.choch,
       leverage: snapshot.tradePlan.leverage,
       lastTrackedCandleTime: snapshot.fiveMinutes.candles.last.time,
+      firstMove: _firstMoveContext(
+        snapshot: snapshot,
+        direction: direction,
+        style: SignalStyle.standard,
+        entryLow: snapshot.tradePlan.entryLow,
+        entryHigh: snapshot.tradePlan.entryHigh,
+        tp1: snapshot.tradePlan.tp1,
+      ),
     );
   }
 
@@ -224,14 +236,18 @@ class SignalEngine {
     final DateTime time = signalTime ?? one.candles.last.time;
     final double price = one.price;
     final double entryPadding = one.atr * 0.10;
-    final double stopDistance = _clampDouble(
-      one.atr * 0.80,
-      price * 0.0012,
-      price * 0.0030,
+    final StructuralTargetPlan targetPlan = StructuralTargetEngine.build(
+      analysis: one,
+      direction: direction,
+      entryLow: price - entryPadding,
+      entryHigh: price + entryPadding,
+      tickSize: snapshot.tradingRules?.tickSize ?? 0.0,
     );
-    final double tp1Distance = stopDistance;
-    final double tp2Distance = stopDistance * 3.0;
-    final bool bullish = direction == SignalDirection.long;
+    final double? structuralStop = StopEngine.findStructuralInvalidation(
+      direction: direction,
+      analysis: one,
+      entry: price,
+    );
     final Bias volumeBias = one.relativeVolume < 0.8
         ? Bias.neutral
         : one.candles.last.isBullish
@@ -250,9 +266,9 @@ class SignalEngine {
       referencePrice: price,
       entryLow: price - entryPadding,
       entryHigh: price + entryPadding,
-      stop: bullish ? price - stopDistance : price + stopDistance,
-      tp1: bullish ? price + tp1Distance : price - tp1Distance,
-      tp2: bullish ? price + tp2Distance : price - tp2Distance,
+      stop: structuralStop ?? 0.0,
+      tp1: targetPlan.tp1,
+      tp2: targetPlan.tp2,
       score: score,
       trend1m: one.trend,
       trend5m: snapshot.fiveMinutes.trend,
@@ -274,6 +290,14 @@ class SignalEngine {
       // Position/Account Risk layer after structural Stop validation.
       leverage: 1,
       lastTrackedCandleTime: one.candles.last.time,
+      firstMove: _firstMoveContext(
+        snapshot: snapshot,
+        direction: direction,
+        style: SignalStyle.scalp,
+        entryLow: price - entryPadding,
+        entryHigh: price + entryPadding,
+        tp1: targetPlan.tp1,
+      ),
     );
   }
 
@@ -932,40 +956,87 @@ class SignalEngine {
   static TradePlan _createTradePlan({
     required TimeframeAnalysis analysis,
     required Bias bias,
+    required double tickSize,
   }) {
     final double atr = analysis.atr;
     final double price = analysis.price;
-
-    if (bias == Bias.bullish) {
-      final double entryLow = price - atr * 0.25;
-      final double entryHigh = price + atr * 0.05;
-      final double stop = entryLow - atr * 1.15;
-      final double risk = entryHigh - stop;
-      return TradePlan(
-        bias: bias,
-        entryLow: entryLow,
-        entryHigh: entryHigh,
-        stop: stop,
-        tp1: entryHigh + risk * 1.5,
-        tp2: entryHigh + risk * 2.5,
-        leverage: 1,
-        reason: 'Вход после удержания зоны и бычьего подтверждения 5м.',
-      );
-    }
-    final double entryLow = price - atr * 0.05;
-    final double entryHigh = price + atr * 0.25;
-    final double stop = entryHigh + atr * 1.15;
-    final double risk = stop - entryLow;
+    final bool bullish = bias == Bias.bullish;
+    final double entryLow = bullish ? price - atr * 0.25 : price - atr * 0.05;
+    final double entryHigh = bullish ? price + atr * 0.05 : price + atr * 0.25;
+    final SignalDirection direction = bullish
+        ? SignalDirection.long
+        : SignalDirection.short;
+    final double? structuralStop = StopEngine.findStructuralInvalidation(
+      direction: direction,
+      analysis: analysis,
+      entry: (entryLow + entryHigh) / 2.0,
+    );
+    final StructuralTargetPlan targets = StructuralTargetEngine.build(
+      analysis: analysis,
+      direction: direction,
+      entryLow: entryLow,
+      entryHigh: entryHigh,
+      tickSize: tickSize,
+    );
     return TradePlan(
       bias: bias,
       entryLow: entryLow,
       entryHigh: entryHigh,
-      stop: stop,
-      tp1: entryLow - risk * 1.5,
-      tp2: entryLow - risk * 2.5,
+      stop: structuralStop ?? 0.0,
+      tp1: targets.tp1,
+      tp2: targets.tp2,
       leverage: 1,
-      reason: 'Вход после отклонения зоны и медвежьего подтверждения 5м.',
+      reason: bullish
+          ? 'Вход после удержания зоны и бычьего подтверждения 5м.'
+          : 'Вход после отклонения зоны и медвежьего подтверждения 5м.',
+      tp1Reason: targets.tp1Label,
+      tp2Reason: targets.tp2Label,
+      structuralTargetValid: targets.valid,
+      structuralStopValid: structuralStop != null,
     );
+  }
+
+  static FirstMoveRecord _firstMoveContext({
+    required MarketSnapshot snapshot,
+    required SignalDirection direction,
+    required SignalStyle style,
+    required double entryLow,
+    required double entryHigh,
+    required double tp1,
+  }) {
+    final double boundary = direction == SignalDirection.long
+        ? entryHigh
+        : entryLow;
+    final double move = boundary <= 0.0 || tp1 <= 0.0
+        ? 0.0
+        : direction == SignalDirection.long
+        ? (tp1 - boundary) / boundary * 100.0
+        : (boundary - tp1) / boundary * 100.0;
+    final double atrPercent = snapshot.ticker.price <= 0.0
+        ? 0.0
+        : snapshot.fifteenMinutes.atr / snapshot.ticker.price * 100.0;
+    return FirstMoveRecord(
+      tradingMode: style == SignalStyle.scalp ? 'MOMENTUM_SCALP' : 'INTRADAY',
+      marketRegime: _marketRegime(snapshot),
+      volatilityRegime: atrPercent >= 2.0
+          ? 'HIGH'
+          : atrPercent >= 0.8
+          ? 'NORMAL'
+          : 'LOW',
+      btcState: snapshot.symbol == 'BTCUSDT' ? 'BENCHMARK' : 'PENDING',
+      expectedMovePercent: move,
+      atrPercent: atrPercent,
+      spreadPercent: snapshot.ticker.spreadPercent,
+    );
+  }
+
+  static String _marketRegime(MarketSnapshot snapshot) {
+    final Bias fifteen = snapshot.fifteenMinutes.trend;
+    final Bias hour = snapshot.oneHour.trend;
+    if (fifteen == Bias.bullish && hour == Bias.bullish) return 'TREND_UP';
+    if (fifteen == Bias.bearish && hour == Bias.bearish) return 'TREND_DOWN';
+    if (fifteen == Bias.neutral && hour == Bias.neutral) return 'RANGE';
+    return 'MIXED';
   }
 
   static double _maxDouble(double first, double second) {
@@ -974,16 +1045,6 @@ class SignalEngine {
 
   static double _minDouble(double first, double second) {
     return first <= second ? first : second;
-  }
-
-  static double _clampDouble(double value, double minimum, double maximum) {
-    if (value < minimum) {
-      return minimum;
-    }
-    if (value > maximum) {
-      return maximum;
-    }
-    return value;
   }
 
   static int _maxInt(int first, int second) {

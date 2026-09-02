@@ -1,6 +1,8 @@
+import '../config/trading_safety_config.dart';
 import '../models/execution_models.dart';
 import '../models/market_data_models.dart';
 import '../models/market_models.dart';
+import '../models/position_calculator_models.dart';
 import '../models/signal_models.dart';
 import '../utils/exchange_decimal.dart';
 
@@ -13,6 +15,8 @@ class StopEngine {
     required FalseBreakoutAnalysis falseBreakout,
     StopVariant variant = StopVariant.structuralAtr,
     InstrumentTradingRules? tradingRules,
+    double observedSpread = 0.0,
+    FeeModel feeModel = const FeeModel(),
   }) {
     final double entry = signal.entryPrice;
     if (tradingRules == null || !tradingRules.isComplete) {
@@ -27,14 +31,48 @@ class StopEngine {
         safe: false,
         quality: 0,
         reasonCodes: const <String>['INSTRUMENT_RULES_UNAVAILABLE'],
+        structuralStopFound: false,
+        bufferComplete: false,
       );
     }
-    final double atr = analysis.atr > 0.0 ? analysis.atr : entry * 0.005;
-    final double invalidation = _invalidation(
-      signal: signal,
+    final double atr = analysis.atr;
+    double? invalidation = findStructuralInvalidation(
+      direction: signal.direction,
       analysis: analysis,
-      atr: atr,
+      entry: entry,
+      seed: signal.structuralStop > 0.0
+          ? signal.structuralStop
+          : signal.invalidationPrice > 0.0
+          ? signal.invalidationPrice
+          : null,
     );
+    if (falseBreakout.state == FalseBreakoutState.confirmed) {
+      invalidation = _closerInvalidation(
+        direction: signal.direction,
+        entry: entry,
+        current: invalidation,
+        candidate: falseBreakout.level,
+      );
+    }
+    if (invalidation == null || atr <= 0.0) {
+      return StopPlan(
+        variant: variant,
+        invalidationPrice: invalidation ?? 0.0,
+        stopPrice: 0.0,
+        buffer: 0.0,
+        bufferAtr: 0.0,
+        bufferPercent: 0.0,
+        riskReward: 0.0,
+        safe: false,
+        quality: 0,
+        reasonCodes: <String>[
+          if (invalidation == null) 'STRUCTURAL_STOP_MISSING',
+          if (atr <= 0.0) 'ATR_UNAVAILABLE',
+        ],
+        structuralStopFound: invalidation != null,
+        bufferComplete: false,
+      );
+    }
     final double tickSize = tradingRules.tickSize;
     final double typicalWick = _typicalAdverseWick(
       analysis.candles,
@@ -47,21 +85,29 @@ class StopEngine {
         ? 0.22
         : 0.16;
 
-    double buffer;
+    double preferredBuffer;
     switch (variant) {
       case StopVariant.structural:
-        buffer = tickSize * 2.0;
+        preferredBuffer = tickSize * 3.0;
         break;
       case StopVariant.structuralAtr:
-        buffer = _maxDouble(atr * atrFactor, tickSize * 3.0);
+        preferredBuffer = _maxDouble(atr * atrFactor, tickSize * 3.0);
         break;
       case StopVariant.structuralWick:
-        buffer = _maxDouble(
+        preferredBuffer = _maxDouble(
           _maxDouble(typicalWick * 1.15, atr * 0.10),
           tickSize * 3.0,
         );
         break;
     }
+    final double slippageBuffer = entry * feeModel.stopSlippagePercent / 100.0;
+    final double minimumBuffer = <double>[
+      atr * TradingSafetyConfig.minStopAtrBuffer,
+      observedSpread.abs() * TradingSafetyConfig.spreadBufferMultiplier,
+      slippageBuffer * TradingSafetyConfig.slippageBufferMultiplier,
+      tickSize * TradingSafetyConfig.tickBufferMultiplier,
+    ].reduce(_maxDouble);
+    double buffer = _maxDouble(preferredBuffer, minimumBuffer);
     if (falseBreakout.state == FalseBreakoutState.confirmed) {
       buffer = _maxDouble(buffer, falseBreakout.overshoot * 1.20);
     }
@@ -83,7 +129,9 @@ class StopEngine {
         : _maxDouble(atr * 2.0, entry * 0.025);
     final bool tooFar = riskDistance > maximumDistance;
     final bool poorRiskReward = riskReward < 0.90;
-    final bool safe = !tooFar && !poorRiskReward;
+    final double appliedBuffer = (stop - invalidation).abs();
+    final bool tooTight = appliedBuffer + tickSize * 0.1 < minimumBuffer;
+    final bool safe = !tooFar && !poorRiskReward && !tooTight;
 
     int quality = variant == StopVariant.structuralAtr
         ? 78
@@ -101,6 +149,7 @@ class StopEngine {
     final List<String> codes = <String>[
       if (variant != StopVariant.structural) 'DYNAMIC_STOP_BUFFER',
       if (tooFar) 'SAFE_STOP_TOO_FAR',
+      if (tooTight) 'STOP_TOO_TIGHT',
       if (poorRiskReward) 'RISK_REWARD_POOR',
       if (safe) 'RISK_REWARD_GOOD',
     ];
@@ -115,43 +164,70 @@ class StopEngine {
       safe: safe,
       quality: quality,
       reasonCodes: List<String>.unmodifiable(codes),
+      structuralStopFound: true,
+      bufferComplete: !tooTight,
+      tooTight: tooTight,
     );
   }
 
-  static double _invalidation({
-    required RadarSignal signal,
+  static double? findStructuralInvalidation({
+    required SignalDirection direction,
     required TimeframeAnalysis analysis,
-    required double atr,
+    required double entry,
+    double? seed,
   }) {
-    final double entry = signal.entryPrice;
     final List<double> candidates = <double>[];
-    if (signal.direction == SignalDirection.long) {
+    if (direction == SignalDirection.long) {
       _addBelow(candidates, analysis.structure.lastSwingLow, entry);
       _addBelow(candidates, analysis.support, entry);
+      _addBelow(candidates, analysis.liquidity.below, entry);
       for (final PriceZone zone in analysis.orderBlocks) {
         if (zone.bias == Bias.bullish) {
           _addBelow(candidates, zone.lower, entry);
         }
       }
-      _addBelow(candidates, signal.stop, entry);
-      if (candidates.isEmpty) {
-        return entry - atr;
+      for (final PriceZone zone in analysis.fairValueGaps) {
+        if (zone.bias == Bias.bullish) {
+          _addBelow(candidates, zone.lower, entry);
+        }
       }
+      _addBelow(candidates, seed, entry);
+      if (candidates.isEmpty) return null;
       return candidates.reduce(_maxDouble);
     }
 
     _addAbove(candidates, analysis.structure.lastSwingHigh, entry);
     _addAbove(candidates, analysis.resistance, entry);
+    _addAbove(candidates, analysis.liquidity.above, entry);
     for (final PriceZone zone in analysis.orderBlocks) {
       if (zone.bias == Bias.bearish) {
         _addAbove(candidates, zone.upper, entry);
       }
     }
-    _addAbove(candidates, signal.stop, entry);
-    if (candidates.isEmpty) {
-      return entry + atr;
+    for (final PriceZone zone in analysis.fairValueGaps) {
+      if (zone.bias == Bias.bearish) {
+        _addAbove(candidates, zone.upper, entry);
+      }
     }
+    _addAbove(candidates, seed, entry);
+    if (candidates.isEmpty) return null;
     return candidates.reduce(_minDouble);
+  }
+
+  static double? _closerInvalidation({
+    required SignalDirection direction,
+    required double entry,
+    required double? current,
+    required double candidate,
+  }) {
+    final bool valid = direction == SignalDirection.long
+        ? candidate > 0.0 && candidate < entry
+        : candidate > entry;
+    if (!valid) return current;
+    if (current == null) return candidate;
+    return direction == SignalDirection.long
+        ? _maxDouble(current, candidate)
+        : _minDouble(current, candidate);
   }
 
   static double _typicalAdverseWick(

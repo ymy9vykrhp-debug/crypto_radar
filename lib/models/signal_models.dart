@@ -1,5 +1,6 @@
 import 'market_models.dart';
 import 'execution_models.dart';
+import 'first_move_models.dart';
 
 enum SignalDirection { long, short }
 
@@ -29,6 +30,7 @@ class RiskRewardEstimate {
   final double expectedR;
 
   String get label => '1:$rewardMultiple';
+  bool get hasHistoricalProbability => probabilityPercent >= 0.0;
 }
 
 enum SignalStatus {
@@ -184,6 +186,7 @@ class RadarSignal {
     this.postStopTp1 = false,
     this.postStopTp2 = false,
     this.postStopTrackingUntil,
+    this.firstMove = const FirstMoveRecord(),
   });
 
   final String id;
@@ -272,6 +275,7 @@ class RadarSignal {
   final bool postStopTp1;
   final bool postStopTp2;
   final DateTime? postStopTrackingUntil;
+  final FirstMoveRecord firstMove;
 
   double get entryPrice => (entryLow + entryHigh) / 2.0;
 
@@ -288,25 +292,21 @@ class RadarSignal {
   bool get stopThenTarget => postStopTp1 || postStopTp2;
 
   List<RiskRewardEstimate> get riskRewardEstimates {
-    final double baseProbability = _clampDouble(
-      52.0 + (score - 75) * 0.6,
-      45.0,
-      68.0,
-    );
-    const Map<int, double> probabilityFactors = <int, double>{
-      1: 1.0,
-      3: 0.42,
-      5: 0.25,
-      9: 0.10,
-    };
-    return probabilityFactors.entries
-        .map<RiskRewardEstimate>((MapEntry<int, double> entry) {
-          final int reward = entry.key;
-          final double probability = baseProbability * entry.value;
-          final double probabilityRatio = probability / 100.0;
-          final double expectedR =
-              probabilityRatio * reward - (1.0 - probabilityRatio);
+    const List<int> rewardMultiples = <int>[1, 3, 5, 9];
+    return rewardMultiples
+        .map<RiskRewardEstimate>((int reward) {
           final double targetDistance = risk * reward;
+          final double targetMovePercent = entryPrice <= 0.0
+              ? 0.0
+              : targetDistance / entryPrice * 100.0;
+          final double? historicalProbability = _historicalProbabilityForMove(
+            targetMovePercent,
+          );
+          final double probability = historicalProbability ?? -1.0;
+          final double probabilityRatio = probability / 100.0;
+          final double expectedR = historicalProbability == null
+              ? -999.0
+              : probabilityRatio * reward - (1.0 - probabilityRatio);
           final double target = direction == SignalDirection.long
               ? entryPrice + targetDistance
               : entryPrice - targetDistance;
@@ -320,10 +320,24 @@ class RadarSignal {
         .toList(growable: false);
   }
 
+  double? _historicalProbabilityForMove(double movePercent) {
+    if (!firstMove.hasEnoughSamples || movePercent <= 0.0) return null;
+    if (movePercent <= 0.20) return firstMove.probability020;
+    if (movePercent <= 0.30) return firstMove.probability030;
+    if (movePercent <= 0.50) return firstMove.probability050;
+    if (movePercent <= 0.75) return firstMove.probability075;
+    if (movePercent <= 1.00) return firstMove.probability100;
+    return null;
+  }
+
   RiskRewardEstimate get recommendedRiskReward {
     final List<RiskRewardEstimate> options = riskRewardEstimates;
-    RiskRewardEstimate best = options.first;
-    for (final RiskRewardEstimate option in options.skip(1)) {
+    final List<RiskRewardEstimate> calibrated = options
+        .where((RiskRewardEstimate option) => option.hasHistoricalProbability)
+        .toList(growable: false);
+    if (calibrated.isEmpty) return options.first;
+    RiskRewardEstimate best = calibrated.first;
+    for (final RiskRewardEstimate option in calibrated.skip(1)) {
       if (option.expectedR > best.expectedR) {
         best = option;
       }
@@ -409,6 +423,7 @@ class RadarSignal {
     bool? postStopTp1,
     bool? postStopTp2,
     DateTime? postStopTrackingUntil,
+    FirstMoveRecord? firstMove,
   }) {
     return RadarSignal(
       id: id ?? this.id,
@@ -504,6 +519,7 @@ class RadarSignal {
       postStopTp2: postStopTp2 ?? this.postStopTp2,
       postStopTrackingUntil:
           postStopTrackingUntil ?? this.postStopTrackingUntil,
+      firstMove: firstMove ?? this.firstMove,
     );
   }
 
@@ -599,6 +615,7 @@ class RadarSignal {
       'postStopTp1': postStopTp1,
       'postStopTp2': postStopTp2,
       'postStopTrackingUntil': postStopTrackingUntil?.toIso8601String(),
+      'firstMove': firstMove.toJson(),
     };
   }
 
@@ -734,6 +751,9 @@ class RadarSignal {
       postStopTp1: _bool(json['postStopTp1']),
       postStopTp2: _bool(json['postStopTp2']),
       postStopTrackingUntil: _date(json['postStopTrackingUntil']),
+      firstMove: json['firstMove'] is Map<String, dynamic>
+          ? FirstMoveRecord.fromJson(json['firstMove'] as Map<String, dynamic>)
+          : const FirstMoveRecord(),
     );
   }
 }
@@ -812,14 +832,4 @@ List<T> _enumList<T extends Enum>(List<T> values, Object? raw) {
     }
   }
   return List<T>.unmodifiable(result);
-}
-
-double _clampDouble(double value, double minimum, double maximum) {
-  if (value < minimum) {
-    return minimum;
-  }
-  if (value > maximum) {
-    return maximum;
-  }
-  return value;
 }

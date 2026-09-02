@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../engines/backtest_engine.dart';
 import '../engines/decision_engine.dart';
+import '../engines/first_move_probability_engine.dart';
 import '../engines/phase_a_engine.dart';
 import '../engines/signal_engine.dart';
 import '../engines/strategy_learning_engine.dart';
@@ -11,8 +12,10 @@ import '../engines/trade_tracker.dart';
 import '../engines/trade_outcome_classifier.dart';
 import '../models/backtest_models.dart';
 import '../models/execution_models.dart';
+import '../models/first_move_models.dart';
 import '../models/market_models.dart';
 import '../models/learning_models.dart';
+import '../models/position_calculator_models.dart';
 import '../models/signal_models.dart';
 import '../models/trading_journal_models.dart';
 import 'journal_store.dart';
@@ -22,11 +25,15 @@ class JournalController extends ChangeNotifier {
     required this.store,
     required this.backtestEngine,
     this.tradeTracker = const TradeTracker(),
-  });
+    FeeModel Function()? feeModelProvider,
+  }) : feeModelProvider = feeModelProvider ?? _defaultFeeModel;
 
   final JournalStore store;
   final BacktestEngine backtestEngine;
   final TradeTracker tradeTracker;
+  final FeeModel Function() feeModelProvider;
+
+  static FeeModel _defaultFeeModel() => const FeeModel();
 
   List<RadarSignal> _signals = <RadarSignal>[];
   List<BacktestReport> _backtests = <BacktestReport>[];
@@ -72,10 +79,19 @@ class JournalController extends ChangeNotifier {
         migratedReasonCodes = true;
       }
     }
-    if (migratedReasonCodes) {
+    _backtests = await store.loadBacktests();
+    bool migratedProbabilityGate = false;
+    for (int index = 0; index < _signals.length; index++) {
+      if (_signals[index].status != SignalStatus.waitingEntry) continue;
+      final RadarSignal gated = _attachAndGateProbability(_signals[index]);
+      if (jsonEncode(gated.toJson()) != jsonEncode(_signals[index].toJson())) {
+        _signals[index] = gated;
+        migratedProbabilityGate = true;
+      }
+    }
+    if (migratedReasonCodes || migratedProbabilityGate) {
       await store.saveSignals(_signals);
     }
-    _backtests = await store.loadBacktests();
     _trades = await store.loadTrades();
     _notes = await store.loadNotes();
     _reviewNotes = await store.loadReviewNotes();
@@ -256,7 +272,10 @@ class JournalController extends ChangeNotifier {
     _notify();
   }
 
-  Future<void> processLiveSnapshot(MarketSnapshot snapshot) async {
+  Future<void> processLiveSnapshot(
+    MarketSnapshot snapshot, {
+    MarketSnapshot? benchmarkMarket,
+  }) async {
     await initialize();
     bool changed = false;
     for (int index = 0; index < _signals.length; index++) {
@@ -271,8 +290,18 @@ class JournalController extends ChangeNotifier {
             ? snapshot.oneMinute.candles
             : snapshot.fiveMinutes.candles,
       );
+      tracked = tracked.copyWith(
+        firstMove: tracked.firstMove.copyWith(
+          btcState: _benchmarkState(snapshot, benchmarkMarket),
+        ),
+      );
       if (tracked.status == SignalStatus.waitingEntry) {
-        tracked = PhaseAEngine.update(market: snapshot, signal: tracked);
+        tracked = PhaseAEngine.update(
+          market: snapshot,
+          signal: tracked,
+          feeModel: feeModelProvider(),
+        );
+        tracked = _attachAndGateProbability(tracked, asOf: snapshot.updatedAt);
       }
       if (!tracked.status.isActive) {
         tracked = TradeOutcomeClassifier.classify(tracked);
@@ -293,11 +322,14 @@ class JournalController extends ChangeNotifier {
       }
       final RadarSignal enrichedCandidate = candidate.copyWith(
         reasonCodes: DecisionEngine.persistedReasonCodesForSignal(candidate),
+        firstMove: candidate.firstMove.copyWith(
+          btcState: _benchmarkState(snapshot, benchmarkMarket),
+        ),
       );
       final ExecutionProfile? learnedProfile = _approvedProfile(
         snapshot.symbol,
       );
-      final RadarSignal preparedCandidate = PhaseAEngine.prepare(
+      RadarSignal preparedCandidate = PhaseAEngine.prepare(
         market: snapshot,
         signal: enrichedCandidate,
         entryVariant:
@@ -306,6 +338,11 @@ class JournalController extends ChangeNotifier {
         profileId: learnedProfile == null
             ? 'live_confirmed'
             : 'learned_${learnedProfile.id}',
+        feeModel: feeModelProvider(),
+      );
+      preparedCandidate = _attachAndGateProbability(
+        preparedCandidate,
+        asOf: snapshot.updatedAt,
       );
       final bool hasActiveStyle = _signals.any(
         (RadarSignal signal) =>
@@ -361,6 +398,32 @@ class JournalController extends ChangeNotifier {
       }
     }
     return null;
+  }
+
+  RadarSignal _attachAndGateProbability(RadarSignal signal, {DateTime? asOf}) {
+    final Iterable<FirstMoveHistoricalBucket> buckets = _backtests.expand(
+      (BacktestReport report) => report.firstMoveBuckets,
+    );
+    final RadarSignal profiled =
+        FirstMoveProbabilityEngine.attachHistoricalProfile(
+          signal: signal,
+          historicalSignals: _signals,
+          historicalBuckets: buckets,
+          asOf: asOf ?? signal.time,
+          feeModel: feeModelProvider(),
+        );
+    return FirstMoveProbabilityEngine.enforceEntryPermission(profiled);
+  }
+
+  String _benchmarkState(MarketSnapshot market, MarketSnapshot? benchmark) {
+    if (market.symbol == 'BTCUSDT') return 'BENCHMARK';
+    if (benchmark == null) return 'UNAVAILABLE';
+    if (benchmark.dataIntegrity.hasCriticalIssue) return 'STALE';
+    final Bias fifteen = benchmark.fifteenMinutes.trend;
+    final Bias hour = benchmark.oneHour.trend;
+    if (fifteen == Bias.bullish && hour == Bias.bullish) return 'TREND_UP';
+    if (fifteen == Bias.bearish && hour == Bias.bearish) return 'TREND_DOWN';
+    return 'MIXED';
   }
 
   void _notify() {

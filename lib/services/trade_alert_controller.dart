@@ -114,8 +114,23 @@ class TradeAlertController extends ChangeNotifier {
             tickSize: tickSize,
           );
         }
-      } else if (_wasEntryReady.contains(signal.id) && signal.stage.isWaiting) {
-        if (readiness.status == EntryReadinessStatus.suspended) {
+      } else if (_wasEntryReady.contains(signal.id)) {
+        if ((signal.stage == SignalStage.inPosition ||
+                signal.stage == SignalStage.tp1Hit) &&
+            _postEntryRiskChanged(readiness)) {
+          final int failures = (_negativeReadinessChecks[signal.id] ?? 0) + 1;
+          _negativeReadinessChecks[signal.id] = failures;
+          if (failures >= 2) {
+            _queueIfAllowed(
+              events,
+              kind: TradeAlertKind.conditionsWorsened,
+              signal: signal,
+              readiness: readiness,
+              tickSize: tickSize,
+            );
+          }
+        } else if (signal.stage.isWaiting &&
+            readiness.status == EntryReadinessStatus.suspended) {
           _queueIfAllowed(
             events,
             kind: TradeAlertKind.entrySuspended,
@@ -123,7 +138,7 @@ class TradeAlertController extends ChangeNotifier {
             readiness: readiness,
             tickSize: tickSize,
           );
-        } else {
+        } else if (signal.stage.isWaiting) {
           final int failures = (_negativeReadinessChecks[signal.id] ?? 0) + 1;
           _negativeReadinessChecks[signal.id] = failures;
           if (failures >= 2) {
@@ -247,6 +262,20 @@ class TradeAlertController extends ChangeNotifier {
     if (previous.direction != signal.direction) return true;
     if (signal.score >= previous.score + significantScoreIncrease) return true;
     return _clock().difference(previous.time) >= cooldown;
+  }
+
+  bool _postEntryRiskChanged(EntryReadinessResult readiness) {
+    const Set<String> critical = <String>{
+      'CRITICAL_MARKET_DATA',
+      'BID_ASK_STALE',
+      'LIQUIDITY_INVALID',
+      'MARKET_CONFLICT',
+      'SIGNAL_STALE',
+      'HARD_BLOCK',
+      'DIRECTION_QUALITY_FAILED',
+    };
+    return readiness.status == EntryReadinessStatus.suspended ||
+        readiness.reasonCodes.any(critical.contains);
   }
 
   Duration _retryDelay(int attempts) => switch (attempts) {

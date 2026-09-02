@@ -11,6 +11,7 @@ import '../models/execution_models.dart';
 import '../models/live_market_models.dart';
 import '../models/market_models.dart';
 import '../models/navigation_models.dart';
+import '../models/position_calculator_models.dart';
 import '../models/signal_models.dart';
 import '../services/bybit_service.dart';
 import '../services/journal_controller.dart';
@@ -34,6 +35,8 @@ class AssetWorkspaceScreen extends StatelessWidget {
     required this.onCalculateTrade,
     this.onRefresh,
     this.livePrice,
+    this.benchmarkMarket,
+    this.feeModel = const FeeModel(),
   });
 
   final MarketSnapshot snapshot;
@@ -44,6 +47,8 @@ class AssetWorkspaceScreen extends StatelessWidget {
   final VoidCallback onCalculateTrade;
   final VoidCallback? onRefresh;
   final ValueListenable<LivePriceTick?>? livePrice;
+  final MarketSnapshot? benchmarkMarket;
+  final FeeModel feeModel;
 
   @override
   Widget build(BuildContext context) {
@@ -119,6 +124,8 @@ class AssetWorkspaceScreen extends StatelessWidget {
             DecisionReadinessEngine.evaluate(
               market: snapshot,
               trackedSignals: journalController.signals,
+              benchmarkMarket: benchmarkMarket,
+              feeModel: feeModel,
             );
         return ProductDashboardScreen(
           snapshot: snapshot,

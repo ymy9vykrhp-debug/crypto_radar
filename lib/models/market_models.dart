@@ -288,6 +288,10 @@ class TradePlan {
     required this.tp2,
     required this.leverage,
     required this.reason,
+    this.tp1Reason = '',
+    this.tp2Reason = '',
+    this.structuralTargetValid = true,
+    this.structuralStopValid = true,
   });
 
   final Bias bias;
@@ -298,6 +302,10 @@ class TradePlan {
   final double tp2;
   final int leverage;
   final String reason;
+  final String tp1Reason;
+  final String tp2Reason;
+  final bool structuralTargetValid;
+  final bool structuralStopValid;
 }
 
 class MarketSnapshot {

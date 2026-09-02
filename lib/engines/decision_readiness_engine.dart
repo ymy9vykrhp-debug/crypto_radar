@@ -1,5 +1,6 @@
 import '../models/decision_models.dart';
 import '../models/market_models.dart';
+import '../models/position_calculator_models.dart';
 import '../models/signal_models.dart';
 import 'decision_engine.dart';
 import 'entry_readiness_gate.dart';
@@ -15,9 +16,12 @@ class DecisionReadinessEngine {
   static DecisionReadinessAnalysis evaluate({
     required MarketSnapshot market,
     Iterable<RadarSignal> trackedSignals = const <RadarSignal>[],
+    MarketSnapshot? benchmarkMarket,
+    FeeModel feeModel = const FeeModel(),
   }) {
     final RadarSignal? executionSignal =
-        _activeTrackedSignal(market.symbol, trackedSignals) ?? _preview(market);
+        _activeTrackedSignal(market.symbol, trackedSignals) ??
+        _preview(market, feeModel);
     final DecisionSnapshot decision = DecisionEngine.build(
       market,
       executionSignal: executionSignal,
@@ -28,6 +32,9 @@ class DecisionReadinessEngine {
       readiness: EntryReadinessGate.evaluate(
         market: market,
         decision: decision,
+        signal: executionSignal,
+        benchmarkMarket: benchmarkMarket,
+        feeModel: feeModel,
         signalId: executionSignal?.id,
         evaluatedAt: market.updatedAt,
       ),
@@ -54,11 +61,15 @@ class DecisionReadinessEngine {
     return candidates.isEmpty ? null : candidates.first;
   }
 
-  static RadarSignal? _preview(MarketSnapshot market) {
+  static RadarSignal? _preview(MarketSnapshot market, FeeModel feeModel) {
     final RadarSignal? rawSignal = SignalEngine.createSignal(market);
     return rawSignal == null
         ? null
-        : PhaseAEngine.preview(market: market, signal: rawSignal);
+        : PhaseAEngine.preview(
+            market: market,
+            signal: rawSignal,
+            feeModel: feeModel,
+          );
   }
 }
 
