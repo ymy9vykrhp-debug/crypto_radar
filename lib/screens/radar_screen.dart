@@ -30,6 +30,7 @@ import '../widgets/app_navigation.dart';
 import '../widgets/product_components.dart';
 import '../widgets/smart_position_calculator_dialog.dart';
 import '../widgets/trade_signal_alert_dialog.dart';
+import '../widgets/signal_helper_guide.dart';
 import 'asset_workspace_screen.dart';
 import 'asset_explorer_screen.dart';
 import 'integrations_screen.dart';

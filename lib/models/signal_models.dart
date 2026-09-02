@@ -1,6 +1,7 @@
 import 'market_models.dart';
 import 'execution_models.dart';
 import 'first_move_models.dart';
+import 'filter_performance_models.dart';
 
 enum SignalDirection { long, short }
 
@@ -187,6 +188,7 @@ class RadarSignal {
     this.postStopTp2 = false,
     this.postStopTrackingUntil,
     this.firstMove = const FirstMoveRecord(),
+    this.activeSignalComponents = const <SignalComponent>[],
   });
 
   final String id;
@@ -276,6 +278,10 @@ class RadarSignal {
   final bool postStopTp2;
   final DateTime? postStopTrackingUntil;
   final FirstMoveRecord firstMove;
+
+  /// Какие компоненты (фильтры) были активны при генерации этого сигнала
+  /// Используется для адаптивной системы мозга
+  final List<SignalComponent> activeSignalComponents;
 
   double get entryPrice => (entryLow + entryHigh) / 2.0;
 
