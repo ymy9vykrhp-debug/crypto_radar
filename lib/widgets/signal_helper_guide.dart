@@ -1,12 +1,12 @@
-/// Помощник для новичков - объясняет каждый сигнал как для начинающего
-/// Показывает галочки и простые объяснения
+﻿/// РџРѕРјРѕС‰РЅРёРє РґР»СЏ РЅРѕРІРёС‡РєРѕРІ - РѕР±СЉСЏСЃРЅСЏРµС‚ РєР°Р¶РґС‹Р№ СЃРёРіРЅР°Р» РєР°Рє РґР»СЏ РЅР°С‡РёРЅР°СЋС‰РµРіРѕ
+/// РџРѕРєР°Р·С‹РІР°РµС‚ РіР°Р»РѕС‡РєРё Рё РїСЂРѕСЃС‚С‹Рµ РѕР±СЉСЏСЃРЅРµРЅРёСЏ
 
 import 'package:flutter/material.dart';
 
 import '../models/filter_performance_models.dart';
 import '../models/signal_models.dart';
 
-/// Элемент проверки условия с объяснением
+/// Р­Р»РµРјРµРЅС‚ РїСЂРѕРІРµСЂРєРё СѓСЃР»РѕРІРёСЏ СЃ РѕР±СЉСЏСЃРЅРµРЅРёРµРј
 class SignalConditionCheck {
   const SignalConditionCheck({
 	required this.label,
@@ -36,12 +36,12 @@ class SignalConditionCheck {
 	}
   }
 
-  String get statusText => isActive ? 'ДА ✓' : 'НЕТ ✗';
+  String get statusText => isActive ? 'Р”Рђ вњ“' : 'РќР•Рў вњ—';
 }
 
 enum SignalImportance { critical, high, medium, low }
 
-/// Помощник сигнала - объясняет новичку что происходит
+/// РџРѕРјРѕС‰РЅРёРє СЃРёРіРЅР°Р»Р° - РѕР±СЉСЏСЃРЅСЏРµС‚ РЅРѕРІРёС‡РєСѓ С‡С‚Рѕ РїСЂРѕРёСЃС…РѕРґРёС‚
 class SignalHelperGuide extends StatefulWidget {
   const SignalHelperGuide({
 	super.key,
@@ -100,7 +100,7 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 		),
 		child: Column(
 		  children: [
-			// Заголовок
+			// Р—Р°РіРѕР»РѕРІРѕРє
 			InkWell(
 			  onTap: () {
 				setState(() {
@@ -111,7 +111,7 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 				padding: const EdgeInsets.all(16),
 				child: Row(
 				  children: [
-					// Иконка помощника
+					// РРєРѕРЅРєР° РїРѕРјРѕС‰РЅРёРєР°
 					Container(
 					  padding: const EdgeInsets.all(12),
 					  decoration: BoxDecoration(
@@ -120,26 +120,26 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 						borderRadius: BorderRadius.circular(8),
 					  ),
 					  child: const Text(
-						'🧑‍🏫',
+						'рџ§‘вЂЌрџЏ«',
 						style: TextStyle(fontSize: 24),
 					  ),
 					),
 					const SizedBox(width: 12),
 
-					// Заголовок
+					// Р—Р°РіРѕР»РѕРІРѕРє
 					Expanded(
 					  child: Column(
 						crossAxisAlignment: CrossAxisAlignment.start,
 						children: [
 						  Text(
-							'Помощник сигнала',
+							'РџРѕРјРѕС‰РЅРёРє СЃРёРіРЅР°Р»Р°',
 							style: Theme.of(context)
 								.textTheme
 								.titleMedium
 								?.copyWith(fontWeight: FontWeight.bold),
 						  ),
 						  Text(
-							'Что здесь происходит и почему входить',
+							'Р§С‚Рѕ Р·РґРµСЃСЊ РїСЂРѕРёСЃС…РѕРґРёС‚ Рё РїРѕС‡РµРјСѓ РІС…РѕРґРёС‚СЊ',
 							style: Theme.of(context)
 								.textTheme
 								.bodySmall
@@ -149,7 +149,7 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 					  ),
 					),
 
-					// Уверенность
+					// РЈРІРµСЂРµРЅРЅРѕСЃС‚СЊ
 					Container(
 					  padding: const EdgeInsets.symmetric(
 						horizontal: 12,
@@ -189,14 +189,14 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 				child: Column(
 				  crossAxisAlignment: CrossAxisAlignment.start,
 				  children: [
-					// Короткое объяснение
+					// РљРѕСЂРѕС‚РєРѕРµ РѕР±СЉСЏСЃРЅРµРЅРёРµ
 					_buildExplanationBox(context),
 
 					const SizedBox(height: 16),
 
-					// Галочки условий
+					// Р“Р°Р»РѕС‡РєРё СѓСЃР»РѕРІРёР№
 					Text(
-					  '✓ Что совпало (${activeConditions.length} из ${widget.conditions.length}):',
+					  'вњ“ Р§С‚Рѕ СЃРѕРІРїР°Р»Рѕ (${activeConditions.length} РёР· ${widget.conditions.length}):',
 					  style: Theme.of(context).textTheme.titleSmall,
 					),
 					const SizedBox(height: 12),
@@ -204,7 +204,7 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 
 					const SizedBox(height: 20),
 
-					// Расчёты для входа
+					// Р Р°СЃС‡С‘С‚С‹ РґР»СЏ РІС…РѕРґР°
 					_buildEntryCalculations(
 					  context,
 					  entryPrice,
@@ -215,12 +215,12 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 
 					const SizedBox(height: 20),
 
-					// Рекомендации новичку
+					// Р РµРєРѕРјРµРЅРґР°С†РёРё РЅРѕРІРёС‡РєСѓ
 					_buildNewbieAdvice(context),
 
 					const SizedBox(height: 16),
 
-					// Кнопка "Я готов входить"
+					// РљРЅРѕРїРєР° "РЇ РіРѕС‚РѕРІ РІС…РѕРґРёС‚СЊ"
 					SizedBox(
 					  width: double.infinity,
 					  child: ElevatedButton.icon(
@@ -229,7 +229,7 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 						},
 						icon: const Icon(Icons.check_circle),
 						label: const Text(
-						  'Я готов входить!',
+						  'РЇ РіРѕС‚РѕРІ РІС…РѕРґРёС‚СЊ!',
 						  style: TextStyle(fontSize: 16),
 						),
 						style: ElevatedButton.styleFrom(
@@ -250,7 +250,7 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 	);
   }
 
-  /// Объяснение сигнала простыми словами
+  /// РћР±СЉСЏСЃРЅРµРЅРёРµ СЃРёРіРЅР°Р»Р° РїСЂРѕСЃС‚С‹РјРё СЃР»РѕРІР°РјРё
   Widget _buildExplanationBox(BuildContext context) {
 	String explanation = _getSimpleExplanation();
 
@@ -265,7 +265,7 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 		crossAxisAlignment: CrossAxisAlignment.start,
 		children: [
 		  Text(
-			'Простыми словами:',
+			'РџСЂРѕСЃС‚С‹РјРё СЃР»РѕРІР°РјРё:',
 			style: Theme.of(context)
 				.textTheme
 				.bodyMedium
@@ -283,7 +283,7 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 	);
   }
 
-  /// Галочки для каждого условия
+  /// Р“Р°Р»РѕС‡РєРё РґР»СЏ РєР°Р¶РґРѕРіРѕ СѓСЃР»РѕРІРёСЏ
   List<Widget> _buildConditions(BuildContext context) {
 	return widget.conditions.map((condition) {
 	  return Padding(
@@ -291,7 +291,7 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 		child: Row(
 		  crossAxisAlignment: CrossAxisAlignment.start,
 		  children: [
-			// Галочка или крест
+			// Р“Р°Р»РѕС‡РєР° РёР»Рё РєСЂРµСЃС‚
 			Container(
 			  width: 32,
 			  height: 32,
@@ -309,7 +309,7 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 			),
 			const SizedBox(width: 12),
 
-			// Текст условия и объяснение
+			// РўРµРєСЃС‚ СѓСЃР»РѕРІРёСЏ Рё РѕР±СЉСЏСЃРЅРµРЅРёРµ
 			Expanded(
 			  child: Column(
 				crossAxisAlignment: CrossAxisAlignment.start,
@@ -367,7 +367,7 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 	}).toList();
   }
 
-  /// Расчёты для входа
+  /// Р Р°СЃС‡С‘С‚С‹ РґР»СЏ РІС…РѕРґР°
   Widget _buildEntryCalculations(
 	BuildContext context,
 	String entry,
@@ -386,7 +386,7 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 		crossAxisAlignment: CrossAxisAlignment.start,
 		children: [
 		  Text(
-			'📊 Расчёты для входа:',
+			'рџ“Љ Р Р°СЃС‡С‘С‚С‹ РґР»СЏ РІС…РѕРґР°:',
 			style: Theme.of(context)
 				.textTheme
 				.bodyMedium
@@ -394,30 +394,30 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 		  ),
 		  const SizedBox(height: 10),
 		  _buildCalculationRow(
-			'Цена входа',
+			'Р¦РµРЅР° РІС…РѕРґР°',
 			'\$$entry',
-			'Вот в эту цену ты входишь в позицию',
+			'Р’РѕС‚ РІ СЌС‚Сѓ С†РµРЅСѓ С‚С‹ РІС…РѕРґРёС€СЊ РІ РїРѕР·РёС†РёСЋ',
 			Colors.blue,
 		  ),
 		  const SizedBox(height: 8),
 		  _buildCalculationRow(
-			'Риск (где стоп)',
+			'Р РёСЃРє (РіРґРµ СЃС‚РѕРї)',
 			'-\$$risk',
-			'Максимум что потеряешь если ошибся',
+			'РњР°РєСЃРёРјСѓРј С‡С‚Рѕ РїРѕС‚РµСЂСЏРµС€СЊ РµСЃР»Рё РѕС€РёР±СЃСЏ',
 			Colors.red,
 		  ),
 		  const SizedBox(height: 8),
 		  _buildCalculationRow(
-			'Прибыль (цель)',
+			'РџСЂРёР±С‹Р»СЊ (С†РµР»СЊ)',
 			'+\$$reward',
-			'Сколько можешь заработать если прав',
+			'РЎРєРѕР»СЊРєРѕ РјРѕР¶РµС€СЊ Р·Р°СЂР°Р±РѕС‚Р°С‚СЊ РµСЃР»Рё РїСЂР°РІ',
 			Colors.green,
 		  ),
 		  const SizedBox(height: 8),
 		  _buildCalculationRow(
-			'Соотношение',
+			'РЎРѕРѕС‚РЅРѕС€РµРЅРёРµ',
 			'1:$ratio',
-			'За каждый доллар риска ты заработаешь $ratio',
+			'Р—Р° РєР°Р¶РґС‹Р№ РґРѕР»Р»Р°СЂ СЂРёСЃРєР° С‚С‹ Р·Р°СЂР°Р±РѕС‚Р°РµС€СЊ $ratio',
 			Colors.orange,
 		  ),
 		],
@@ -425,7 +425,7 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 	);
   }
 
-  /// Одна строка расчёта
+  /// РћРґРЅР° СЃС‚СЂРѕРєР° СЂР°СЃС‡С‘С‚Р°
   Widget _buildCalculationRow(
 	String label,
 	String value,
@@ -475,7 +475,7 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 	);
   }
 
-  /// Советы новичку
+  /// РЎРѕРІРµС‚С‹ РЅРѕРІРёС‡РєСѓ
   Widget _buildNewbieAdvice(BuildContext context) {
 	return Container(
 	  padding: const EdgeInsets.all(12),
@@ -488,29 +488,29 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 		crossAxisAlignment: CrossAxisAlignment.start,
 		children: [
 		  Text(
-			'💡 Советы для новичка:',
+			'рџ’Ў РЎРѕРІРµС‚С‹ РґР»СЏ РЅРѕРІРёС‡РєР°:',
 			style: Theme.of(context)
 				.textTheme
 				.bodyMedium
 				?.copyWith(fontWeight: FontWeight.bold),
 		  ),
 		  const SizedBox(height: 10),
-		  _buildAdviceTip('✓ Всегда ставь стоп-лосс где система говорит'),
+		  _buildAdviceTip('вњ“ Р’СЃРµРіРґР° СЃС‚Р°РІСЊ СЃС‚РѕРї-Р»РѕСЃСЃ РіРґРµ СЃРёСЃС‚РµРјР° РіРѕРІРѕСЂРёС‚'),
 		  const SizedBox(height: 8),
 		  _buildAdviceTip(
-			  '✓ Не меняй цели - они рассчитаны математически'),
+			  'вњ“ РќРµ РјРµРЅСЏР№ С†РµР»Рё - РѕРЅРё СЂР°СЃСЃС‡РёС‚Р°РЅС‹ РјР°С‚РµРјР°С‚РёС‡РµСЃРєРё'),
 		  const SizedBox(height: 8),
 		  _buildAdviceTip(
-			  '✓ Ждите подтверждения цены в зоне входа (±0.2%)'),
+			  'вњ“ Р–РґРёС‚Рµ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёСЏ С†РµРЅС‹ РІ Р·РѕРЅРµ РІС…РѕРґР° (В±0.2%)'),
 		  const SizedBox(height: 8),
 		  _buildAdviceTip(
-			  '⚠️ Если количество ✓ меньше 3 - подожди лучшего сигнала'),
+			  'вљ пёЏ Р•СЃР»Рё РєРѕР»РёС‡РµСЃС‚РІРѕ вњ“ РјРµРЅСЊС€Рµ 3 - РїРѕРґРѕР¶РґРё Р»СѓС‡С€РµРіРѕ СЃРёРіРЅР°Р»Р°'),
 		],
 	  ),
 	);
   }
 
-  /// Одна строка совета
+  /// РћРґРЅР° СЃС‚СЂРѕРєР° СЃРѕРІРµС‚Р°
   Widget _buildAdviceTip(String text) {
 	return Text(
 	  text,
@@ -522,31 +522,31 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 	);
   }
 
-  /// Получить простое объяснение сигнала
+  /// РџРѕР»СѓС‡РёС‚СЊ РїСЂРѕСЃС‚РѕРµ РѕР±СЉСЏСЃРЅРµРЅРёРµ СЃРёРіРЅР°Р»Р°
   String _getSimpleExplanation() {
 	final direction = widget.signal.direction == SignalDirection.long
-		? 'вверх ⬆️'
-		: 'вниз ⬇️';
+		? 'РІРІРµСЂС… в¬†пёЏ'
+		: 'РІРЅРёР· в¬‡пёЏ';
 	final components = widget.signal.activeSignalComponents;
 	final componentCount = components.length;
 
 	String explanation =
-		'Несколько факторов подтвердили, что цена должна пойти $direction. ';
+		'РќРµСЃРєРѕР»СЊРєРѕ С„Р°РєС‚РѕСЂРѕРІ РїРѕРґС‚РІРµСЂРґРёР»Рё, С‡С‚Рѕ С†РµРЅР° РґРѕР»Р¶РЅР° РїРѕР№С‚Рё $direction. ';
 
 	if (componentCount >= 5) {
 	  explanation +=
-		  'Сигнал очень сильный - целых $componentCount сигналов совпало! 🔥';
+		  'РЎРёРіРЅР°Р» РѕС‡РµРЅСЊ СЃРёР»СЊРЅС‹Р№ - С†РµР»С‹С… $componentCount СЃРёРіРЅР°Р»РѕРІ СЃРѕРІРїР°Р»Рѕ! рџ”Ґ';
 	} else if (componentCount >= 3) {
 	  explanation +=
-		  'Хороший сигнал - $componentCount ключевых фактора указывают в одну сторону.';
+		  'РҐРѕСЂРѕС€РёР№ СЃРёРіРЅР°Р» - $componentCount РєР»СЋС‡РµРІС‹С… С„Р°РєС‚РѕСЂР° СѓРєР°Р·С‹РІР°СЋС‚ РІ РѕРґРЅСѓ СЃС‚РѕСЂРѕРЅСѓ.';
 	} else {
-	  explanation += 'Сигнал слабоват - подожди ещё условий.';
+	  explanation += 'РЎРёРіРЅР°Р» СЃР»Р°Р±РѕРІР°С‚ - РїРѕРґРѕР¶РґРё РµС‰С‘ СѓСЃР»РѕРІРёР№.';
 	}
 
 	return explanation;
   }
 
-  /// Цвет на основе доверия
+  /// Р¦РІРµС‚ РЅР° РѕСЃРЅРѕРІРµ РґРѕРІРµСЂРёСЏ
   Color _getConfidenceColor(double confidence) {
 	if (confidence >= 80) return Colors.green;
 	if (confidence >= 65) return Colors.lightGreen;
@@ -555,38 +555,38 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 	return Colors.red;
   }
 
-  /// Диалог "Готов входить"
+  /// Р”РёР°Р»РѕРі "Р“РѕС‚РѕРІ РІС…РѕРґРёС‚СЊ"
   void _showReadyDialog(BuildContext context) {
 	showDialog(
 	  context: context,
 	  builder: (context) => AlertDialog(
-		title: const Text('✓ Готовишься входить?'),
+		title: const Text('вњ“ Р“РѕС‚РѕРІРёС€СЊСЃСЏ РІС…РѕРґРёС‚СЊ?'),
 		content: Column(
 		  mainAxisSize: MainAxisSize.min,
 		  crossAxisAlignment: CrossAxisAlignment.start,
 		  children: [
-			const Text('Убедись что:'),
+			const Text('РЈР±РµРґРёСЃСЊ С‡С‚Рѕ:'),
 			const SizedBox(height: 12),
-			_buildChecklist('Стоп-лосс установлен на месте (снизу/сверху)'),
-			_buildChecklist('Размер позиции соответствует твоему риску (1-2%)'),
-			_buildChecklist('Ты NOT в режиме "погорячиться"'),
-			_buildChecklist('Рынок ПО ПРЕЖНЕМУ в нужной зоне цены'),
-			_buildChecklist('Твоё состояние позволяет торговать спокойно'),
+			_buildChecklist('РЎС‚РѕРї-Р»РѕСЃСЃ СѓСЃС‚Р°РЅРѕРІР»РµРЅ РЅР° РјРµСЃС‚Рµ (СЃРЅРёР·Сѓ/СЃРІРµСЂС…Сѓ)'),
+			_buildChecklist('Р Р°Р·РјРµСЂ РїРѕР·РёС†РёРё СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓРµС‚ С‚РІРѕРµРјСѓ СЂРёСЃРєСѓ (1-2%)'),
+			_buildChecklist('РўС‹ NOT РІ СЂРµР¶РёРјРµ "РїРѕРіРѕСЂСЏС‡РёС‚СЊСЃСЏ"'),
+			_buildChecklist('Р С‹РЅРѕРє РџРћ РџР Р•Р–РќР•РњРЈ РІ РЅСѓР¶РЅРѕР№ Р·РѕРЅРµ С†РµРЅС‹'),
+			_buildChecklist('РўРІРѕС‘ СЃРѕСЃС‚РѕСЏРЅРёРµ РїРѕР·РІРѕР»СЏРµС‚ С‚РѕСЂРіРѕРІР°С‚СЊ СЃРїРѕРєРѕР№РЅРѕ'),
 		  ],
 		),
 		actions: [
 		  TextButton(
 			onPressed: () => Navigator.pop(context),
-			child: const Text('Подожди ещё'),
+			child: const Text('РџРѕРґРѕР¶РґРё РµС‰С‘'),
 		  ),
 		  ElevatedButton(
 			onPressed: () {
 			  Navigator.pop(context);
 			  ScaffoldMessenger.of(context).showSnackBar(
-				const SnackBar(
+				SnackBar(
 				  content: Text(
-					'🎯 Давай! Вход на ${widget.signal.entryPrice}. '
-					'Удачи! Помни про стоп! 🍀',
+					'рџЋЇ Р”Р°РІР°Р№! Р’С…РѕРґ РЅР° ${widget.signal.entryPrice}. '
+					'РЈРґР°С‡Рё! РџРѕРјРЅРё РїСЂРѕ СЃС‚РѕРї! рџЌЂ',
 				  ),
 				  duration: Duration(seconds: 5),
 				),
@@ -595,14 +595,14 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 			style: ElevatedButton.styleFrom(
 			  backgroundColor: Colors.green,
 			),
-			child: const Text('Я готов! Входу!'),
+			child: const Text('РЇ РіРѕС‚РѕРІ! Р’С…РѕРґСѓ!'),
 		  ),
 		],
 	  ),
 	);
   }
 
-  /// Элемент чек-листа
+  /// Р­Р»РµРјРµРЅС‚ С‡РµРє-Р»РёСЃС‚Р°
   Widget _buildChecklist(String text) {
 	return Padding(
 	  padding: const EdgeInsets.only(bottom: 8),
@@ -611,7 +611,7 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
 		children: [
 		  const Padding(
 			padding: EdgeInsets.only(top: 2),
-			child: Text('☑️', style: TextStyle(fontSize: 14)),
+			child: Text('в‘пёЏ', style: TextStyle(fontSize: 14)),
 		  ),
 		  const SizedBox(width: 8),
 		  Expanded(
@@ -626,7 +626,7 @@ class _SignalHelperGuideState extends State<SignalHelperGuide> {
   }
 }
 
-/// Factory для создания условий из сигнала
+/// Factory РґР»СЏ СЃРѕР·РґР°РЅРёСЏ СѓСЃР»РѕРІРёР№ РёР· СЃРёРіРЅР°Р»Р°
 class SignalConditionFactory {
   static List<SignalConditionCheck> createFromSignal(RadarSignal signal) {
 	final conditions = <SignalConditionCheck>[];
@@ -635,12 +635,12 @@ class SignalConditionFactory {
 	if (signal.activeSignalComponents.contains(SignalComponent.priceActionPattern)) {
 	  conditions.add(
 		SignalConditionCheck(
-		  label: '🕯️ Price Action (Паттерн свечей)',
+		  label: 'рџ•ЇпёЏ Price Action (РџР°С‚С‚РµСЂРЅ СЃРІРµС‡РµР№)',
 		  isActive: true,
-		  emoji: '✓',
+		  emoji: 'вњ“',
 		  explanation:
-			  'Свеча сформировала хороший паттерн (pin bar, engulfing и т.д.) '
-			  '- это показывает, что продавцы/покупатели не в состоянии давить дальше.',
+			  'РЎРІРµС‡Р° СЃС„РѕСЂРјРёСЂРѕРІР°Р»Р° С…РѕСЂРѕС€РёР№ РїР°С‚С‚РµСЂРЅ (pin bar, engulfing Рё С‚.Рґ.) '
+			  '- СЌС‚Рѕ РїРѕРєР°Р·С‹РІР°РµС‚, С‡С‚Рѕ РїСЂРѕРґР°РІС†С‹/РїРѕРєСѓРїР°С‚РµР»Рё РЅРµ РІ СЃРѕСЃС‚РѕСЏРЅРёРё РґР°РІРёС‚СЊ РґР°Р»СЊС€Рµ.',
 		  importance: SignalImportance.critical,
 		),
 	  );
@@ -651,12 +651,12 @@ class SignalConditionFactory {
 		.contains(SignalComponent.fibonacci38Level)) {
 	  conditions.add(
 		SignalConditionCheck(
-		  label: '⚖️ Fibonacci 38.2%',
+		  label: 'вљ–пёЏ Fibonacci 38.2%',
 		  isActive: true,
-		  emoji: '✓',
+		  emoji: 'вњ“',
 		  explanation:
-			  'Цена откатилась на золотой уровень Фибоначчи - это место '
-			  'где часто происходит отскок. Вероятность на нашей стороне.',
+			  'Р¦РµРЅР° РѕС‚РєР°С‚РёР»Р°СЃСЊ РЅР° Р·РѕР»РѕС‚РѕР№ СѓСЂРѕРІРµРЅСЊ Р¤РёР±РѕРЅР°С‡С‡Рё - СЌС‚Рѕ РјРµСЃС‚Рѕ '
+			  'РіРґРµ С‡Р°СЃС‚Рѕ РїСЂРѕРёСЃС…РѕРґРёС‚ РѕС‚СЃРєРѕРє. Р’РµСЂРѕСЏС‚РЅРѕСЃС‚СЊ РЅР° РЅР°С€РµР№ СЃС‚РѕСЂРѕРЅРµ.',
 		  importance: SignalImportance.high,
 		),
 	  );
@@ -666,12 +666,12 @@ class SignalConditionFactory {
 	if (signal.activeSignalComponents.contains(SignalComponent.volumeSpike)) {
 	  conditions.add(
 		SignalConditionCheck(
-		  label: '📊 Объём спайк',
+		  label: 'рџ“Љ РћР±СЉС‘Рј СЃРїР°Р№Рє',
 		  isActive: true,
-		  emoji: '✓',
+		  emoji: 'вњ“',
 		  explanation:
-			  'Объём торговли резко возрос - это значит, что за сигнал стоит '
-			  'РЕАЛЬНЫЕ деньги трейдеров. Не шум, а материал.',
+			  'РћР±СЉС‘Рј С‚РѕСЂРіРѕРІР»Рё СЂРµР·РєРѕ РІРѕР·СЂРѕСЃ - СЌС‚Рѕ Р·РЅР°С‡РёС‚, С‡С‚Рѕ Р·Р° СЃРёРіРЅР°Р» СЃС‚РѕРёС‚ '
+			  'Р Р•РђР›Р¬РќР«Р• РґРµРЅСЊРіРё С‚СЂРµР№РґРµСЂРѕРІ. РќРµ С€СѓРј, Р° РјР°С‚РµСЂРёР°Р».',
 		  importance: SignalImportance.high,
 		),
 	  );
@@ -681,12 +681,12 @@ class SignalConditionFactory {
 	if (signal.activeSignalComponents.contains(SignalComponent.rsiOversold)) {
 	  conditions.add(
 		SignalConditionCheck(
-		  label: '🔴 RSI Oversold',
+		  label: 'рџ”ґ RSI Oversold',
 		  isActive: true,
-		  emoji: '✓',
+		  emoji: 'вњ“',
 		  explanation:
-			  'Индикатор RSI показывает что рынок "перепродан" - значит '
-			  'вероятнее всего будет отскок вверх. Люди паникуют - это хорошо для нас!',
+			  'РРЅРґРёРєР°С‚РѕСЂ RSI РїРѕРєР°Р·С‹РІР°РµС‚ С‡С‚Рѕ СЂС‹РЅРѕРє "РїРµСЂРµРїСЂРѕРґР°РЅ" - Р·РЅР°С‡РёС‚ '
+			  'РІРµСЂРѕСЏС‚РЅРµРµ РІСЃРµРіРѕ Р±СѓРґРµС‚ РѕС‚СЃРєРѕРє РІРІРµСЂС…. Р›СЋРґРё РїР°РЅРёРєСѓСЋС‚ - СЌС‚Рѕ С…РѕСЂРѕС€Рѕ РґР»СЏ РЅР°СЃ!',
 		  importance: SignalImportance.medium,
 		),
 	  );
@@ -696,28 +696,28 @@ class SignalConditionFactory {
 	if (signal.activeSignalComponents.contains(SignalComponent.trendAbove200ma)) {
 	  conditions.add(
 		SignalConditionCheck(
-		  label: '📈 Тренд выше 200MA',
+		  label: 'рџ“€ РўСЂРµРЅРґ РІС‹С€Рµ 200MA',
 		  isActive: true,
-		  emoji: '✓',
+		  emoji: 'вњ“',
 		  explanation:
-			  'Цена ВЫШЕ долгосрочной скользящей средней - глобальный тренд '
-			  'нашей стороны. Вероятность победы выше.',
+			  'Р¦РµРЅР° Р’Р«РЁР• РґРѕР»РіРѕСЃСЂРѕС‡РЅРѕР№ СЃРєРѕР»СЊР·СЏС‰РµР№ СЃСЂРµРґРЅРµР№ - РіР»РѕР±Р°Р»СЊРЅС‹Р№ С‚СЂРµРЅРґ '
+			  'РЅР°С€РµР№ СЃС‚РѕСЂРѕРЅС‹. Р’РµСЂРѕСЏС‚РЅРѕСЃС‚СЊ РїРѕР±РµРґС‹ РІС‹С€Рµ.',
 		  importance: SignalImportance.medium,
 		),
 	  );
 	}
 
-	// Добавить "неактивные" условия для примера
+	// Р”РѕР±Р°РІРёС‚СЊ "РЅРµР°РєС‚РёРІРЅС‹Рµ" СѓСЃР»РѕРІРёСЏ РґР»СЏ РїСЂРёРјРµСЂР°
 	if (signal.activeSignalComponents.length < 4) {
 	  if (!signal.activeSignalComponents
 		  .contains(SignalComponent.priceActionPattern)) {
 		conditions.add(
 		  SignalConditionCheck(
-			label: '🕯️ Price Action (Паттерн свечей)',
+			label: 'рџ•ЇпёЏ Price Action (РџР°С‚С‚РµСЂРЅ СЃРІРµС‡РµР№)',
 			isActive: false,
-			emoji: '✗',
+			emoji: 'вњ—',
 			explanation:
-				'Свеча не образовала чёткий паттерн - немного слабовато для входа.',
+				'РЎРІРµС‡Р° РЅРµ РѕР±СЂР°Р·РѕРІР°Р»Р° С‡С‘С‚РєРёР№ РїР°С‚С‚РµСЂРЅ - РЅРµРјРЅРѕРіРѕ СЃР»Р°Р±РѕРІР°С‚Рѕ РґР»СЏ РІС…РѕРґР°.',
 			importance: SignalImportance.critical,
 		  ),
 		);
@@ -727,3 +727,4 @@ class SignalConditionFactory {
 	return conditions;
   }
 }
+
