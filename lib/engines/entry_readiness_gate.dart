@@ -400,13 +400,16 @@ final bool probabilityReady = true;
     final bool dataSuspended =
         !marketDataReady || !microstructureReady || !signalFresh;
     final bool structuralVeto =
-        strictChecks &&
-        (!structuralTargetReady ||
-            (checkStructuralTarget &&
-    (!structuralTargetReady ||
-        obstacle != null ||
-        targetMovePercent < TradingSafetyConfig.minReadyMovePercent)) ||
-            netRiskReward < TradingSafetyConfig.minNetRiskReward);
+        final bool structuralVeto =
+    strictChecks &&
+    ((checkStructuralTarget &&
+            (!structuralTargetReady ||
+                obstacle != null ||
+                targetMovePercent <
+                    TradingSafetyConfig.minReadyMovePercent)) ||
+        !structuralStopReady ||
+        !stopBufferReady ||
+        netRiskReward < TradingSafetyConfig.minNetRiskReward);
     final EntryReadinessStatus status = entryReady
         ? EntryReadinessStatus.entryReady
         : dataSuspended
