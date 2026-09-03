@@ -164,16 +164,19 @@ bool checkMarketContext = true,
         !microstructureReady ||
         decision.executionAction.toUpperCase().contains('NO TRADE');
     final bool entryConfirmed =
+     !checkEntryConfirmation ||
         decision.signalStage == SignalStage.entryConfirmed ||
         decision.signalStage == SignalStage.inPosition ||
         decision.signalStage == SignalStage.tp1Hit ||
         decision.signalStage == SignalStage.tp2Hit;
     final bool priceInZone =
-        decision.entryLow > 0.0 &&
+          !checkEntryZone ||
+        (decision.entryLow > 0.0 &&
         decision.entryHigh >= decision.entryLow &&
         decision.price >= decision.entryLow &&
-        decision.price <= decision.entryHigh;
+        decision.price <= decision.entryHigh);
     final bool liquidityReady =
+         !checkLiquidity ||
         decision.qualityScores.liquidity >= 70 ||
         decision.liquiditySweepConfirmed;
     final bool riskReady =
