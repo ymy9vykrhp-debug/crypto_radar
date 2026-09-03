@@ -48,6 +48,7 @@ checkLiquidity: checkLiquidity,
 checkStructuralTarget: checkStructuralTarget,
 checkMarketContext: checkMarketContext,
     );
+);
   }
 
   static RadarSignal? _activeTrackedSignal(
