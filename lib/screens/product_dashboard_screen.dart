@@ -82,6 +82,7 @@ final AppPreferencesController preferences;
               snapshot: snapshot,
               decision: decision,
               readiness: readiness,
+preferences: preferences,
               strings: strings,
               onWhy: onWhy,
               onRefresh: onRefresh,
