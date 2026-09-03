@@ -407,6 +407,11 @@ class _CryptoRadarHomeState extends State<CryptoRadarHome> {
       trackedSignals: _journalController.signals,
       benchmarkMarket: _multiAssetMonitor.latestSnapshotFor('BTCUSDT'),
       feeModel: widget.preferences.feeModel,
+checkEntryZone: widget.preferences.checkEntryZone,
+checkEntryConfirmation: widget.preferences.checkEntryConfirmation,
+checkLiquidity: widget.preferences.checkLiquidity,
+checkStructuralTarget: widget.preferences.checkStructuralTarget,
+checkMarketContext: widget.preferences.checkMarketContext,
     );
   }
 
