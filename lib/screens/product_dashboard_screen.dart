@@ -584,21 +584,6 @@ class _ActionAndPlan extends StatelessWidget {
         critical: true,
       ),
       _DecisionCheck(
-        label: strings.pick(
-          'Историческая вероятность первого движения',
-          'Historical first-move probability',
-        ),
-        detail: readiness.historicalSamples < 50
-            ? strings.pick(
-                'ДАННЫХ НЕДОСТАТОЧНО · ${readiness.historicalSamples}/50',
-                'INSUFFICIENT DATA · ${readiness.historicalSamples}/50',
-              )
-            : '0.30% → ${readiness.firstMoveProbability?.toStringAsFixed(1) ?? '—'}% · ${readiness.historicalConfidence}',
-        passed:
-            readiness.historicalSamples >= 50 &&
-            (readiness.firstMoveProbability ?? 0.0) >= 70.0,
-      ),
-      _DecisionCheck(
         label: strings.pick('Контекст BTC / рынка', 'BTC / market context'),
         detail: readiness.marketContextReady
             ? 'NO CRITICAL CONFLICT'
