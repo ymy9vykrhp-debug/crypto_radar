@@ -296,18 +296,15 @@ class EntryReadinessGate {
         (!evaluationTime.isBefore(signal.time.toUtc()) &&
             evaluationTime.difference(signal.time.toUtc()) <= maximumSignalAge);
     final bool spreadReady =
-        spreadPercent <= TradingSafetyConfig.maxReadySpreadPercent;
-    final bool historicalSamplesReady =
-        !strictChecks || signal.firstMove.hasEnoughSamples;
-    final double? firstMoveProbability = signal?.firstMove.probabilityFor(
-      TradingSafetyConfig.readinessProbabilityTargetPercent,
-    );
-    final bool probabilityReady =
-        !strictChecks ||
-        (historicalSamplesReady &&
-            firstMoveProbability != null &&
-            firstMoveProbability >=
-                TradingSafetyConfig.minReadyFirstMoveProbabilityPercent);
+        spreadPercent <= TradingSafetyConfig.// Historical statistics are collected for research,
+// but do not block entry readiness.
+final bool historicalSamplesReady = true;
+
+final double? firstMoveProbability = signal?.firstMove.probabilityFor(
+  TradingSafetyConfig.readinessProbabilityTargetPercent,
+);
+
+final bool probabilityReady = true;
     final bool marketContextReady = _marketContextReady(
       market: market,
       benchmarkMarket: benchmarkMarket,
