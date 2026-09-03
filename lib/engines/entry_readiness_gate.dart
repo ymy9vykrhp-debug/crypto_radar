@@ -296,7 +296,9 @@ class EntryReadinessGate {
         (!evaluationTime.isBefore(signal.time.toUtc()) &&
             evaluationTime.difference(signal.time.toUtc()) <= maximumSignalAge);
     final bool spreadReady =
-        spreadPercent <= TradingSafetyConfig.// Historical statistics are collected for research,
+    spreadPercent <= TradingSafetyConfig.maxReadySpreadPercent;
+
+// Historical statistics are collected for research,
 // but do not block entry readiness.
 final bool historicalSamplesReady = true;
 
