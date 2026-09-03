@@ -493,6 +493,7 @@ class _ActionAndPlan extends StatelessWidget {
     required this.snapshot,
     required this.decision,
     required this.readiness,
+required this.preferences,
     required this.strings,
     required this.onWhy,
     required this.onRefresh,
@@ -504,6 +505,7 @@ class _ActionAndPlan extends StatelessWidget {
   final MarketSnapshot snapshot;
   final DecisionSnapshot decision;
   final EntryReadinessResult readiness;
+final AppPreferencesController preferences;
   final AppStrings strings;
   final VoidCallback onWhy;
   final VoidCallback? onRefresh;
