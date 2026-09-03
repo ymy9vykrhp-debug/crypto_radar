@@ -788,11 +788,22 @@ class _DecisionChecklist extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            strings.pick('ПРОВЕРКА ПЕРЕД ВХОДОМ', 'PRE-ENTRY CHECK'),
-            style: Theme.of(context).textTheme.labelLarge
-                ?.copyWith(fontWeight: FontWeight.w900),
-          ),
+          Row(
+  children: <Widget>[
+    Expanded(
+      child: Text(
+        strings.pick('ПРОВЕРКА ПЕРЕД ВХОДОМ', 'PRE-ENTRY CHECK'),
+        style: Theme.of(context).textTheme.labelLarge
+            ?.copyWith(fontWeight: FontWeight.w900),
+      ),
+    ),
+    IconButton(
+      tooltip: strings.pick('Настроить проверки', 'Configure checks'),
+      icon: const Icon(Icons.settings_rounded),
+      onPressed: () {},
+    ),
+  ],
+),
           const SizedBox(height: 9),
           ...checks.map<Widget>((_DecisionCheck check) {
             final Color checkColor = check.passed
