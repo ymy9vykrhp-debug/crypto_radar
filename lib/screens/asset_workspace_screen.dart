@@ -15,7 +15,7 @@ import '../models/position_calculator_models.dart';
 import '../models/signal_models.dart';
 import '../services/bybit_service.dart';
 import '../services/journal_controller.dart';
-import '../services/journal_controller.dart';
+import '../services/app_preferences_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_navigation.dart';
 import '../widgets/product_components.dart';
