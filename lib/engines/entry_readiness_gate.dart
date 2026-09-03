@@ -402,10 +402,10 @@ final bool probabilityReady = true;
     final bool structuralVeto =
         strictChecks &&
         (!structuralTargetReady ||
-            !structuralStopReady ||
-            !stopBufferReady ||
-            obstacle != null ||
-            targetMovePercent < TradingSafetyConfig.minReadyMovePercent ||
+            (checkStructuralTarget &&
+    (!structuralTargetReady ||
+        obstacle != null ||
+        targetMovePercent < TradingSafetyConfig.minReadyMovePercent)) ||
             netRiskReward < TradingSafetyConfig.minNetRiskReward);
     final EntryReadinessStatus status = entryReady
         ? EntryReadinessStatus.entryReady
