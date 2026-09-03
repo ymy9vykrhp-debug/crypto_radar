@@ -127,6 +127,11 @@ class EntryReadinessGate {
     FeeModel feeModel = const FeeModel(),
     String? signalId,
     DateTime? evaluatedAt,
+bool checkEntryZone = true,
+bool checkEntryConfirmation = true,
+bool checkLiquidity = true,
+bool checkStructuralTarget = true,
+bool checkMarketContext = true,
   }) {
     final List<EntryReadinessReason> reasons = <EntryReadinessReason>[];
     void addReason(EntryReadinessReason reason) {
