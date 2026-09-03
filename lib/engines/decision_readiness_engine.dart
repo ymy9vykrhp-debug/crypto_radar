@@ -47,7 +47,7 @@ checkEntryConfirmation: checkEntryConfirmation,
 checkLiquidity: checkLiquidity,
 checkStructuralTarget: checkStructuralTarget,
 checkMarketContext: checkMarketContext,
-    );
+    ),
 );
   }
 
