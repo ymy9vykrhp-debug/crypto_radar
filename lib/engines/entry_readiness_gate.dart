@@ -252,6 +252,7 @@ bool checkMarketContext = true,
         : market.fifteenMinutes;
     final double tickSize = market.tradingRules?.tickSize ?? 0.0;
     final bool structuralTargetReady =
+!checkStructuralTarget ||
         !strictChecks ||
         (market.tradePlan.structuralTargetValid &&
             direction != null &&
