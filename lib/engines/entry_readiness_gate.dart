@@ -400,7 +400,6 @@ final bool probabilityReady = true;
     final bool dataSuspended =
         !marketDataReady || !microstructureReady || !signalFresh;
     final bool structuralVeto =
-        final bool structuralVeto =
     strictChecks &&
     ((checkStructuralTarget &&
             (!structuralTargetReady ||
