@@ -775,10 +775,15 @@ class _DecisionCheck {
 }
 
 class _DecisionChecklist extends StatelessWidget {
-  const _DecisionChecklist({required this.strings, required this.checks});
+ const _DecisionChecklist({
+  required this.strings,
+  required this.checks,
+  required this.preferences,
+});
 
   final AppStrings strings;
   final List<_DecisionCheck> checks;
+final AppPreferencesController preferences;
 
   @override
   Widget build(BuildContext context) {
