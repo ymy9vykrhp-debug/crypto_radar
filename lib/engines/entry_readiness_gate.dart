@@ -316,7 +316,9 @@ final double? firstMoveProbability = signal?.firstMove.probabilityFor(
 );
 
 final bool probabilityReady = true;
-    final bool marketContextReady = _marketContextReady(
+    final bool marketContextReady =
+!checkMarketContext ||
+ _marketContextReady(
       market: market,
       benchmarkMarket: benchmarkMarket,
       direction: direction,
