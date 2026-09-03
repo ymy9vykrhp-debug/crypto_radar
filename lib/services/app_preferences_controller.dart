@@ -23,6 +23,11 @@ class AppPreferencesController extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.dark;
   AppLanguage _language = AppLanguage.ru;
   bool _soundEnabled = true;
+bool _checkEntryZone = true;
+bool _checkEntryConfirmation = true;
+bool _checkLiquidity = true;
+bool _checkStructuralTarget = true;
+bool _checkMarketContext = true;
   RiskPreset _riskPreset = RiskPreset.normal;
   double _customRiskPercent = 2.0;
   double _accountEquity = 0.0;
