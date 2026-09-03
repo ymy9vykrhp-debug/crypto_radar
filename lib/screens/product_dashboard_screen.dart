@@ -659,6 +659,7 @@ final AppPreferencesController preferences;
                 final Widget checklist = _DecisionChecklist(
                   strings: strings,
                   checks: checks,
+preferences: preferences,
                 );
                 final Widget plan = _PlanPreview(
                   decision: decision,
