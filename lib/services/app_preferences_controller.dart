@@ -83,6 +83,25 @@ bool get checkMarketContext => _checkMarketContext;
       _soundEnabled = decoded['soundEnabled'] is bool
           ? decoded['soundEnabled'] as bool
           : _soundEnabled;
+      _checkEntryZone = decoded['checkEntryZone'] is bool
+    ? decoded['checkEntryZone'] as bool
+    : _checkEntryZone;
+
+_checkEntryConfirmation = decoded['checkEntryConfirmation'] is bool
+    ? decoded['checkEntryConfirmation'] as bool
+    : _checkEntryConfirmation;
+
+_checkLiquidity = decoded['checkLiquidity'] is bool
+    ? decoded['checkLiquidity'] as bool
+    : _checkLiquidity;
+
+_checkStructuralTarget = decoded['checkStructuralTarget'] is bool
+    ? decoded['checkStructuralTarget'] as bool
+    : _checkStructuralTarget;
+
+_checkMarketContext = decoded['checkMarketContext'] is bool
+    ? decoded['checkMarketContext'] as bool
+    : _checkMarketContext;
       _riskPreset =
           RiskPreset.values
               .where((RiskPreset value) => value.name == decoded['riskPreset'])
