@@ -43,6 +43,11 @@ bool _checkMarketContext = true;
   ThemeMode get themeMode => _themeMode;
   AppLanguage get language => _language;
   bool get soundEnabled => _soundEnabled;
+  bool get checkEntryZone => _checkEntryZone;
+bool get checkEntryConfirmation => _checkEntryConfirmation;
+bool get checkLiquidity => _checkLiquidity;
+bool get checkStructuralTarget => _checkStructuralTarget;
+bool get checkMarketContext => _checkMarketContext;
   RiskPreset get riskPreset => _riskPreset;
   double get customRiskPercent => _customRiskPercent;
   double get effectiveRiskPercent => _riskPreset == RiskPreset.custom
