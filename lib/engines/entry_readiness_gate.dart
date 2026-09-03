@@ -377,9 +377,10 @@ final bool probabilityReady = true;
         !strictChecks ||
         (setupReady &&
             entryZoneReady &&
-            targetMovePercent >= TradingSafetyConfig.minReadyMovePercent &&
-            structuralTargetReady &&
-            obstacle == null &&
+            (!checkStructuralTarget ||
+    (targetMovePercent >= TradingSafetyConfig.minReadyMovePercent &&
+        structuralTargetReady &&
+        obstacle == null)) &&
             signalFresh &&
             spreadReady &&
             historicalSamplesReady &&
