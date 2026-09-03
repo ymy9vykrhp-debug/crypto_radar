@@ -936,51 +936,7 @@ class _PlanPreview extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          Divider(color: Theme.of(context).colorScheme.outlineVariant),
-          const SizedBox(height: 8),
-          Text(
-            strings.pick(
-              'ВЕРОЯТНОСТЬ ПЕРВОГО ДВИЖЕНИЯ',
-              'FIRST MOVE PROBABILITY',
-            ),
-            style: Theme.of(context).textTheme.labelLarge
-                ?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 9),
-          if (readiness.historicalSamples < 50)
-            Text(
-              strings.pick(
-                'ДАННЫХ НЕДОСТАТОЧНО: ${readiness.historicalSamples} из 50 похожих завершённых наблюдений. Вход запрещён.',
-                'INSUFFICIENT DATA: ${readiness.historicalSamples} of 50 similar completed observations. Entry is blocked.',
-              ),
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
-                fontWeight: FontWeight.w800,
-              ),
-            )
-          else ...<Widget>[
-            Wrap(
-              spacing: 20,
-              runSpacing: 10,
-              children: readiness.firstMoveProbabilities.entries
-                  .map<Widget>(
-                    (MapEntry<double, double?> item) => _PlanValue(
-                      label: '+${item.key.toStringAsFixed(2)}%',
-                      value: item.value == null
-                          ? '—'
-                          : '${item.value!.toStringAsFixed(1)}%',
-                    ),
-                  )
-                  .toList(growable: false),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Stop First: ${readiness.stopFirstProbability?.toStringAsFixed(1) ?? '—'}% · '
-              'Samples: ${readiness.historicalSamples} · ${readiness.historicalConfidence}',
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ],
-          const SizedBox(height: 13),
+ 
           Wrap(
             spacing: 18,
             runSpacing: 7,
