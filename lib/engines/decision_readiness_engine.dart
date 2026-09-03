@@ -42,7 +42,11 @@ bool checkMarketContext = true,
         feeModel: feeModel,
         signalId: executionSignal?.id,
         evaluatedAt: market.updatedAt,
-      ),
+checkEntryZone: checkEntryZone,
+checkEntryConfirmation: checkEntryConfirmation,
+checkLiquidity: checkLiquidity,
+checkStructuralTarget: checkStructuralTarget,
+checkMarketContext: checkMarketContext,
     );
   }
 
