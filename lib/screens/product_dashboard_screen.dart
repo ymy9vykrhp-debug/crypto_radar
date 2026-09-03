@@ -12,6 +12,7 @@ import '../models/market_models.dart';
 import '../models/navigation_models.dart';
 import '../models/signal_models.dart';
 import '../services/journal_controller.dart';
+import '../services/app_preferences_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/product_components.dart';
 
@@ -22,6 +23,7 @@ class ProductDashboardScreen extends StatelessWidget {
     required this.decision,
     required this.readiness,
     required this.journalController,
+required this.preferences,
     required this.onWhy,
     required this.onOpenWorkspace,
     required this.onCalculateTrade,
@@ -35,6 +37,7 @@ class ProductDashboardScreen extends StatelessWidget {
   final DecisionSnapshot decision;
   final EntryReadinessResult readiness;
   final JournalController journalController;
+final AppPreferencesController preferences;
   final VoidCallback onWhy;
   final VoidCallback onOpenWorkspace;
   final VoidCallback onCalculateTrade;
