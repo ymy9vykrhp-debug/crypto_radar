@@ -29,6 +29,7 @@ class AssetWorkspaceScreen extends StatelessWidget {
     super.key,
     required this.snapshot,
     required this.journalController,
+required this.preferences,
     required this.bybitService,
     required this.selected,
     required this.onSelected,
@@ -41,6 +42,7 @@ class AssetWorkspaceScreen extends StatelessWidget {
 
   final MarketSnapshot snapshot;
   final JournalController journalController;
+final AppPreferencesController preferences;
   final BybitService bybitService;
   final WorkspaceSection selected;
   final ValueChanged<WorkspaceSection> onSelected;
