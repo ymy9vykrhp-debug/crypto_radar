@@ -161,6 +161,40 @@ bool get checkMarketContext => _checkMarketContext;
     notifyListeners();
     _scheduleSave();
   }
+  void setCheckEntryZone(bool value) {
+  if (_checkEntryZone == value) return;
+  _checkEntryZone = value;
+  notifyListeners();
+  _scheduleSave();
+}
+
+void setCheckEntryConfirmation(bool value) {
+  if (_checkEntryConfirmation == value) return;
+  _checkEntryConfirmation = value;
+  notifyListeners();
+  _scheduleSave();
+}
+
+void setCheckLiquidity(bool value) {
+  if (_checkLiquidity == value) return;
+  _checkLiquidity = value;
+  notifyListeners();
+  _scheduleSave();
+}
+
+void setCheckStructuralTarget(bool value) {
+  if (_checkStructuralTarget == value) return;
+  _checkStructuralTarget = value;
+  notifyListeners();
+  _scheduleSave();
+}
+
+void setCheckMarketContext(bool value) {
+  if (_checkMarketContext == value) return;
+  _checkMarketContext = value;
+  notifyListeners();
+  _scheduleSave();
+}
 
   void setRiskPreset(RiskPreset value) {
     if (_riskPreset == value) return;
