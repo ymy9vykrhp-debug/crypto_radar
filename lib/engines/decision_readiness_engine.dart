@@ -18,6 +18,11 @@ class DecisionReadinessEngine {
     Iterable<RadarSignal> trackedSignals = const <RadarSignal>[],
     MarketSnapshot? benchmarkMarket,
     FeeModel feeModel = const FeeModel(),
+bool checkEntryZone = true,
+bool checkEntryConfirmation = true,
+bool checkLiquidity = true,
+bool checkStructuralTarget = true,
+bool checkMarketContext = true,
   }) {
     final RadarSignal? executionSignal =
         _activeTrackedSignal(market.symbol, trackedSignals) ??
