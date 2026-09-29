@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - terminal-ui
   workflow_dispatch:
 
 permissions:
